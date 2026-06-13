@@ -1,0 +1,1578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ApartmentNetwork.com — Template Maker</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #f0f4f8;
+      color: #1a2e4a;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1a2e4a 0%, #2d4a6e 100%);
+      color: white;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    header .logo { font-size: 19px; font-weight: 700; letter-spacing: -0.5px; }
+    header .logo span { color: #d4a017; }
+    header .subtitle { font-size: 11px; opacity: 0.65; margin-top: 2px; }
+
+    /* MODE TABS */
+    .mode-bar {
+      background: white;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      padding: 0 20px;
+      gap: 2px;
+    }
+    .mode-tab {
+      padding: 12px 18px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .mode-tab:hover { color: #1a2e4a; }
+    .mode-tab.active { color: #1a2e4a; border-bottom-color: #d4a017; }
+
+    .app-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      height: calc(100vh - 106px);
+    }
+
+    /* LEFT PANEL */
+    .controls {
+      background: white;
+      border-right: 1px solid #e2e8f0;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .controls-inner {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      flex: 1;
+    }
+
+    .mode-panel { display: none; flex-direction: column; gap: 15px; }
+    .mode-panel.active { display: flex; }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    /* Audience Cards */
+    .audience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .audience-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      background: white;
+    }
+    .audience-card:hover { border-color: #1a2e4a; background: #f8fafc; }
+    .audience-card.selected { border-color: #d4a017; background: #fffbeb; box-shadow: 0 0 0 1px #d4a017; }
+    .audience-card .icon { font-size: 22px; margin-bottom: 5px; }
+    .audience-card .label { font-size: 11px; font-weight: 600; color: #1a2e4a; line-height: 1.3; }
+    .audience-card.selected .label { color: #92610b; }
+
+    /* Format & Variations toggles */
+    .toggle-row { display: flex; gap: 6px; }
+    .toggle-btn {
+      flex: 1;
+      padding: 8px 6px;
+      border: 2px solid #e2e8f0;
+      border-radius: 7px;
+      background: white;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .toggle-btn:hover { border-color: #1a2e4a; color: #1a2e4a; }
+    .toggle-btn.selected { border-color: #1a2e4a; background: #1a2e4a; color: white; }
+
+    /* Style cards */
+    .style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .style-card {
+      border: 2px solid #e2e8f0;
+      border-radius: 7px;
+      padding: 9px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+    }
+    .style-card:hover { border-color: #1a2e4a; color: #1a2e4a; }
+    .style-card.selected { border-color: #d4a017; background: #fffbeb; color: #92610b; }
+    .style-card .style-icon { font-size: 18px; margin-bottom: 3px; }
+    .style-preview-btn {
+      margin-top: 6px; font-size: 10px; color: #64748b;
+      background: #f1f5f9; border-radius: 4px; padding: 3px 7px;
+      display: inline-block; transition: all 0.12s;
+    }
+    .style-preview-btn:hover { background: #e2e8f0; color: #1a2e4a; }
+
+    /* Text inputs */
+    .text-input {
+      width: 100%;
+      padding: 10px 11px;
+      border: 2px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 13px;
+      font-family: inherit;
+      color: #1a2e4a;
+      resize: vertical;
+      transition: border-color 0.2s;
+      line-height: 1.5;
+    }
+    .text-input:focus { outline: none; border-color: #1a2e4a; }
+    .text-input::placeholder { color: #94a3b8; }
+    .content-area { min-height: 150px; }
+
+    /* Example chips */
+    .examples { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    .example-chip {
+      padding: 4px 9px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      font-size: 11px;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .example-chip:hover { background: #e2e8f0; color: #1a2e4a; }
+
+    /* Bottom action bar */
+    .action-bar {
+      padding: 14px 18px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: white;
+    }
+
+    .generate-btn {
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #d4a017, #b8860b);
+      color: white;
+      border: none;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+    .generate-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 5px 18px rgba(212,160,23,0.4);
+    }
+    .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .generate-btn .spinner {
+      width: 15px; height: 15px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: none;
+    }
+    .generate-btn.loading .spinner { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .reset-btn {
+      width: 100%;
+      padding: 9px;
+      background: white;
+      color: #64748b;
+      border: 1px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .reset-btn:hover { background: #f8fafc; color: #dc2626; border-color: #fca5a5; }
+
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 7px;
+      padding: 9px 11px;
+      font-size: 12px;
+      color: #dc2626;
+      display: none;
+    }
+
+    .divider { height: 1px; background: #f1f5f9; }
+    .helper-text { font-size: 10px; color: #94a3b8; line-height: 1.4; margin-top: 4px; }
+
+    /* ═══════════════════════════════════════
+       RIGHT PANEL
+    ═══════════════════════════════════════ */
+    .preview-panel { display: flex; flex-direction: column; background: #f0f4f8; overflow: hidden; }
+
+    .preview-toolbar {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 9px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 50px;
+    }
+
+    /* Variation tabs */
+    .variation-tabs { display: flex; gap: 4px; }
+    .var-tab {
+      padding: 5px 12px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: white;
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+      position: relative;
+    }
+    .var-tab:hover { background: #f8fafc; color: #1a2e4a; }
+    .var-tab.active { background: #1a2e4a; color: white; border-color: #1a2e4a; }
+    .var-tab.saved-dot::after {
+      content: '';
+      position: absolute;
+      top: 3px; right: 3px;
+      width: 6px; height: 6px;
+      background: #22c55e;
+      border-radius: 50%;
+    }
+
+    .toolbar-spacer { flex: 1; }
+
+    .view-tabs { display: flex; gap: 3px; }
+    .view-tab {
+      padding: 5px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      background: white;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .view-tab.active { background: #475569; color: white; border-color: #475569; }
+
+    .toolbar-btn {
+      padding: 6px 11px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: white;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .toolbar-btn:hover { background: #f8fafc; border-color: #cbd5e1; color: #1a2e4a; }
+    .toolbar-btn.save-btn { border-color: #22c55e; color: #16a34a; }
+    .toolbar-btn.save-btn:hover { background: #f0fdf4; }
+    .toolbar-btn.save-btn.saved { background: #f0fdf4; color: #15803d; }
+    .toolbar-btn.primary { background: #1a2e4a; color: white; border-color: #1a2e4a; }
+    .toolbar-btn.primary:hover { background: #2d4a6e; }
+
+    .preview-content { flex: 1; overflow: hidden; position: relative; }
+
+    #preview-frame { width: 100%; height: 100%; border: none; display: block; }
+    #code-view {
+      display: none; width: 100%; height: 100%;
+      overflow: auto; background: #0f172a; padding: 18px;
+    }
+    #code-view pre {
+      color: #e2e8f0;
+      font-family: 'Cascadia Code','Fira Code',monospace;
+      font-size: 12px; line-height: 1.6;
+      white-space: pre-wrap; word-break: break-all;
+    }
+
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; color: #94a3b8;
+      text-align: center; padding: 40px;
+      position: absolute; inset: 0;
+      background: #f0f4f8; z-index: 1;
+    }
+    .empty-state .empty-icon { font-size: 56px; margin-bottom: 12px; opacity: 0.45; }
+    .empty-state h3 { font-size: 16px; color: #475569; margin-bottom: 7px; }
+    .empty-state p { font-size: 13px; max-width: 280px; line-height: 1.5; }
+
+    .status-bar {
+      background: white; border-top: 1px solid #e2e8f0;
+      padding: 6px 16px; font-size: 11px; color: #64748b;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #94a3b8; flex-shrink: 0; }
+    .status-dot.success { background: #22c55e; }
+    .status-dot.loading { background: #f59e0b; animation: pulse 1s infinite; }
+    .status-dot.error { background: #ef4444; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+    /* ═══════════════════════════════════════
+       SAVED TEMPLATES PANEL
+    ═══════════════════════════════════════ */
+    .saved-panel { display: none; flex-direction: column; gap: 0; }
+    .saved-panel.active { display: flex; }
+
+    .saved-empty {
+      text-align: center; padding: 40px 20px;
+      color: #94a3b8; font-size: 13px; line-height: 1.6;
+    }
+    .saved-empty .saved-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+
+    .saved-list { display: flex; flex-direction: column; gap: 0; }
+
+    .folder-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 16px;
+      background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      cursor: pointer; user-select: none;
+    }
+    .folder-header:hover { background: #f1f5f9; }
+    .folder-icon { font-size: 16px; }
+    .folder-label { font-size: 12px; font-weight: 700; color: #1a2e4a; flex: 1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .folder-count { font-size: 10px; background: #e2e8f0; color: #64748b; border-radius: 10px; padding: 1px 7px; }
+    .folder-chevron { font-size: 10px; color: #94a3b8; }
+    .folder-item { padding-left: 28px !important; }
+
+    .saved-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #f1f5f9;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .saved-item:hover { background: #f8fafc; }
+    .saved-item.active-item { background: #fffbeb; border-left: 3px solid #d4a017; }
+
+    .saved-item-icon { font-size: 20px; flex-shrink: 0; }
+    .saved-item-info { flex: 1; min-width: 0; }
+    .saved-item-label {
+      font-size: 13px; font-weight: 600; color: #1a2e4a;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .saved-item-meta { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+
+    .saved-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .saved-action-btn {
+      padding: 4px 8px; border: 1px solid #e2e8f0;
+      border-radius: 5px; background: white;
+      font-size: 11px; color: #64748b; cursor: pointer;
+      transition: all 0.12s;
+    }
+    .saved-action-btn:hover { background: #f8fafc; color: #1a2e4a; }
+    .saved-action-btn.delete:hover { background: #fef2f2; color: #dc2626; border-color: #fca5a5; }
+
+    /* SAVE DIALOG */
+    .dialog-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .dialog-overlay.open { display: flex; }
+    .dialog {
+      background: white; border-radius: 12px;
+      padding: 28px; width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .dialog h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #1a2e4a; }
+    .dialog p { font-size: 13px; color: #64748b; margin-bottom: 16px; }
+    .dialog input {
+      width: 100%; padding: 10px 12px;
+      border: 2px solid #e2e8f0; border-radius: 7px;
+      font-size: 14px; font-family: inherit;
+      color: #1a2e4a; margin-bottom: 16px;
+      transition: border-color 0.2s;
+    }
+    .dialog input:focus { outline: none; border-color: #1a2e4a; }
+    .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .dialog-btn {
+      padding: 9px 18px; border-radius: 7px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid #e2e8f0; background: white; color: #64748b;
+      transition: all 0.12s;
+    }
+    .dialog-btn:hover { background: #f8fafc; }
+    .dialog-btn.primary {
+      background: #1a2e4a; color: white; border-color: #1a2e4a;
+    }
+    .dialog-btn.primary:hover { background: #2d4a6e; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Apartment<span>Network</span>.com</div>
+    <div class="subtitle">Marketing Template Maker</div>
+  </div>
+  <div style="margin-left:auto; display:flex; gap:20px; align-items:center;">
+    <div style="text-align:right;">
+      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">This Session</div>
+      <div id="cost-session" style="font-size:14px; font-weight:700; color:#d4a017;">$0.0000</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">All Time</div>
+      <div id="cost-alltime" style="font-size:14px; font-weight:700; color:#d4a017;">$0.0000</div>
+    </div>
+    <div style="text-align:right; cursor:pointer;" onclick="resetAllTimeCost()" title="Reset all-time total">
+      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">Last Gen</div>
+      <div id="cost-last" style="font-size:14px; font-weight:700; color:#a0b4c8;">—</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">Credits</div>
+      <a href="https://console.anthropic.com/settings/billing" target="_blank" style="font-size:12px; font-weight:700; color:#7cb8a0; text-decoration:none;" title="View billing in Anthropic Console">Check Balance →</a>
+    </div>
+  </div>
+</header>
+
+<!-- MODE TABS -->
+<div class="mode-bar">
+  <button class="mode-tab active" id="tab-marketing" onclick="switchMode('marketing')">🎯 Marketing Outreach</button>
+  <button class="mode-tab" id="tab-custom" onclick="switchMode('custom')">✏️ Custom Content</button>
+  <button class="mode-tab" id="tab-saved" onclick="switchMode('saved')">💾 Saved Templates <span id="saved-count" style="background:#d4a017;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;display:none">0</span></button>
+</div>
+
+<div class="app-layout">
+
+  <!-- LEFT: CONTROLS -->
+  <div class="controls">
+    <div class="controls-inner">
+
+      <!-- ══════════ MARKETING MODE ══════════ -->
+      <div class="mode-panel active" id="panel-marketing">
+        <div>
+          <div class="section-title">1. Audience</div>
+          <div class="audience-grid">
+            <div class="audience-card" data-audience="leasing_agent" onclick="selectAudience(this)">
+              <div class="icon">🏠</div><div class="label">Leasing Agent / Team</div>
+            </div>
+            <div class="audience-card" data-audience="property_manager" onclick="selectAudience(this)">
+              <div class="icon">👔</div><div class="label">Property Manager</div>
+            </div>
+            <div class="audience-card" data-audience="regional_manager" onclick="selectAudience(this)">
+              <div class="icon">📊</div><div class="label">Regional Manager</div>
+            </div>
+            <div class="audience-card" data-audience="realtor_locator" onclick="selectAudience(this)">
+              <div class="icon">🔑</div><div class="label">Realtor / Agent</div>
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">2. Format</div>
+          <div class="toggle-row">
+            <button class="toggle-btn selected" data-format="email" onclick="selectFormat(this,'marketing')">✉️ Email</button>
+            <button class="toggle-btn" data-format="flyer" onclick="selectFormat(this,'marketing')">📄 Flyer</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">3. Colors (optional)</div>
+          <input id="marketing-colors" class="text-input" type="text" style="padding:9px 11px;"
+            placeholder="e.g. red and white, teal and gold, purple and silver...">
+          <p class="helper-text">Leave blank — Claude picks a creative palette each time.</p>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">4. Theme / Details (optional)</div>
+          <textarea id="marketing-details" class="text-input" rows="3"
+            placeholder="4th of July theme, spring season, highlight a specific feature..."></textarea>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">5. How Many Variations?</div>
+          <div class="toggle-row">
+            <button class="toggle-btn" data-count="1" onclick="selectCount(this,'marketing')">1</button>
+            <button class="toggle-btn" data-count="2" onclick="selectCount(this,'marketing')">2</button>
+            <button class="toggle-btn selected" data-count="3" onclick="selectCount(this,'marketing')">3</button>
+            <button class="toggle-btn" data-count="4" onclick="selectCount(this,'marketing')">4</button>
+            <button class="toggle-btn" data-count="5" onclick="selectCount(this,'marketing')">5</button>
+          </div>
+          <p class="helper-text">Generate multiple versions to compare and choose your favorite.</p>
+        </div>
+        <div class="error-msg" id="error-marketing"></div>
+      </div>
+
+      <!-- ══════════ CUSTOM MODE ══════════ -->
+      <div class="mode-panel" id="panel-custom">
+        <div>
+          <div class="section-title">1. Your Content</div>
+          <textarea id="custom-content" class="text-input content-area" rows="8"
+            placeholder="Paste or type any content...&#10;&#10;• Event announcement&#10;• Special offer or promotion&#10;• Property highlights&#10;• Agent appreciation party details&#10;• Any text → polished design"></textarea>
+          <p class="helper-text">Paste anything — raw text, bullets, announcements. Claude designs it.</p>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">2. Style</div>
+          <div class="style-grid">
+            <div class="style-card selected" data-style="professional" onclick="selectStyle(this)">
+              <div class="style-icon">💼</div>Professional
+              <div class="style-preview-btn" onclick="previewStyle(event,'professional')">👁 Preview</div>
+            </div>
+            <div class="style-card" data-style="bold" onclick="selectStyle(this)">
+              <div class="style-icon">🔥</div>Bold & Eye-Catching
+              <div class="style-preview-btn" onclick="previewStyle(event,'bold')">👁 Preview</div>
+            </div>
+            <div class="style-card" data-style="elegant" onclick="selectStyle(this)">
+              <div class="style-icon">✨</div>Elegant & Clean
+              <div class="style-preview-btn" onclick="previewStyle(event,'elegant')">👁 Preview</div>
+            </div>
+            <div class="style-card" data-style="fun" onclick="selectStyle(this)">
+              <div class="style-icon">🎉</div>Fun & Festive
+              <div class="style-preview-btn" onclick="previewStyle(event,'fun')">👁 Preview</div>
+            </div>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">3. Colors (optional)</div>
+          <input id="custom-colors" class="text-input" type="text" style="padding:9px 11px;"
+            placeholder="e.g. navy and gold, coral and cream, dark red and white...">
+          <p class="helper-text">Leave blank — Claude picks a creative palette each time.</p>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">4. Format</div>
+          <div class="toggle-row">
+            <button class="toggle-btn selected" data-format="email" onclick="selectFormat(this,'custom')">✉️ Email</button>
+            <button class="toggle-btn" data-format="flyer" onclick="selectFormat(this,'custom')">📄 Flyer</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">5. Extra Instructions (optional)</div>
+          <textarea id="custom-instructions" class="text-input" rows="2"
+            placeholder="e.g. make it print-ready, add a bold tagline..."></textarea>
+        </div>
+        <div class="divider"></div>
+        <div>
+          <div class="section-title">6. How Many Variations?</div>
+          <div class="toggle-row">
+            <button class="toggle-btn" data-count="1" onclick="selectCount(this,'custom')">1</button>
+            <button class="toggle-btn" data-count="2" onclick="selectCount(this,'custom')">2</button>
+            <button class="toggle-btn selected" data-count="3" onclick="selectCount(this,'custom')">3</button>
+            <button class="toggle-btn" data-count="4" onclick="selectCount(this,'custom')">4</button>
+            <button class="toggle-btn" data-count="5" onclick="selectCount(this,'custom')">5</button>
+          </div>
+          <p class="helper-text">Generate multiple versions to compare and choose your favorite.</p>
+        </div>
+        <div class="error-msg" id="error-custom"></div>
+      </div>
+
+      <!-- ══════════ SAVED PANEL ══════════ -->
+      <div class="mode-panel" id="panel-saved">
+        <div id="saved-list-container">
+          <div class="saved-empty" id="saved-empty">
+            <div class="saved-empty-icon">💾</div>
+            <div>No saved templates yet.<br>Generate a template and click <strong>Save</strong> to keep it here.</div>
+          </div>
+          <div class="saved-list" id="saved-list"></div>
+        </div>
+      </div>
+
+    </div><!-- end controls-inner -->
+
+    <!-- ACTION BAR (hidden in saved mode) -->
+    <div class="action-bar" id="action-bar">
+      <div class="error-msg" id="error-general"></div>
+      <button class="generate-btn" id="generate-btn" onclick="generate()">
+        <div class="spinner"></div>
+        <span class="btn-text">✨ Generate</span>
+      </button>
+      <button class="reset-btn" onclick="resetAll()">↺ Reset / Start Over</button>
+    </div>
+
+  </div><!-- end controls -->
+
+  <!-- RIGHT: PREVIEW -->
+  <div class="preview-panel">
+    <div class="preview-toolbar" id="preview-toolbar">
+      <!-- variation tabs injected here -->
+      <div class="variation-tabs" id="variation-tabs"></div>
+      <div class="toolbar-spacer"></div>
+      <div class="view-tabs">
+        <button class="view-tab active" onclick="switchView('preview',this)">Preview</button>
+        <button class="view-tab" onclick="switchView('code',this)">HTML</button>
+      </div>
+      <button class="toolbar-btn save-btn" id="save-btn" onclick="openSaveDialog()" style="display:none">💾 Save</button>
+      <button class="toolbar-btn" onclick="copyHTML()" id="copy-btn" style="display:none">📋 Copy</button>
+      <button class="toolbar-btn" onclick="openEmailDialog()" id="send-btn" style="display:none;border-color:#3b82f6;color:#2563eb;">✉️ Send</button>
+      <button class="toolbar-btn primary" onclick="downloadHTML()" id="download-btn" style="display:none">⬇️ Download</button>
+      <button class="toolbar-btn" id="mailforge-save-btn" onclick="saveToMailForge()" style="display:none;background:#2563eb;color:#fff;border-color:#2563eb;font-weight:600;">📥 Save to MailForge</button>
+    </div>
+
+    <div class="preview-content">
+      <iframe id="preview-frame" title="Template Preview"></iframe>
+      <div id="code-view"><pre id="code-content"></pre></div>
+      <div class="empty-state" id="empty-state">
+        <div class="empty-icon">🎨</div>
+        <h3>Ready to Create</h3>
+        <p>Choose <strong>Marketing Outreach</strong> for audience-targeted templates, or <strong>Custom Content</strong> to design any text into a flyer or email.</p>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Select a mode to get started</span>
+    </div>
+  </div>
+</div>
+
+<!-- SEND EMAIL DIALOG -->
+<div class="dialog-overlay" id="email-dialog">
+  <div class="dialog" style="width:440px;">
+    <h3>✉️ Send Email</h3>
+    <p>Send this template directly from flyers@aptnetwork.com</p>
+
+    <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">To <span style="color:#94a3b8;font-weight:400">(separate multiple with commas)</span></label>
+    <input type="text" id="email-to" placeholder="manager@property.com, regional@company.com" style="margin-bottom:12px;">
+
+    <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Subject</label>
+    <input type="text" id="email-subject" placeholder="e.g. Fill Vacancies Faster with ApartmentNetwork.com" style="margin-bottom:12px;">
+
+    <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">From Name</label>
+    <input type="text" id="email-fromname" value="ApartmentNetwork.com" style="margin-bottom:16px;">
+
+    <div id="email-status" style="display:none;padding:10px 12px;border-radius:7px;font-size:13px;margin-bottom:12px;"></div>
+
+    <div class="dialog-actions">
+      <button class="dialog-btn" onclick="closeEmailDialog()">Cancel</button>
+      <button class="dialog-btn primary" id="email-send-btn" onclick="sendEmail()">✉️ Send Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE DIALOG -->
+<div class="dialog-overlay" id="save-dialog">
+  <div class="dialog">
+    <h3>💾 Save Template</h3>
+    <p>Give this template a name so you can find it later.</p>
+    <input type="text" id="save-label-input" placeholder="e.g. Property Manager – 4th of July Email" maxlength="80">
+    <div class="dialog-actions">
+      <button class="dialog-btn" onclick="closeSaveDialog()">Cancel</button>
+      <button class="dialog-btn primary" onclick="confirmSave()">Save Template</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Cost Tracking (Sonnet 4.6 pricing) ──
+  const COST_INPUT_PER_M  = 3.00;  // $3.00 per 1M input tokens
+  const COST_OUTPUT_PER_M = 15.00; // $15.00 per 1M output tokens
+  let sessionCost = 0;
+
+  function calcCost(usage) {
+    if (!usage) return 0;
+    const input  = (usage.input_tokens  || 0) / 1_000_000 * COST_INPUT_PER_M;
+    const output = (usage.output_tokens || 0) / 1_000_000 * COST_OUTPUT_PER_M;
+    return input + output;
+  }
+
+  function trackCost(usage) {
+    const cost = calcCost(usage);
+    sessionCost += cost;
+
+    // All-time from localStorage
+    const allTime = parseFloat(localStorage.getItem('aptnetwork_cost_alltime') || '0') + cost;
+    localStorage.setItem('aptnetwork_cost_alltime', allTime.toFixed(6));
+
+    document.getElementById('cost-last').textContent    = '$' + cost.toFixed(4);
+    document.getElementById('cost-session').textContent = '$' + sessionCost.toFixed(4);
+    document.getElementById('cost-alltime').textContent = '$' + allTime.toFixed(4);
+  }
+
+  function resetAllTimeCost() {
+    if (!confirm('Reset all-time cost total to $0?')) return;
+    localStorage.setItem('aptnetwork_cost_alltime', '0');
+    document.getElementById('cost-alltime').textContent = '$0.0000';
+  }
+
+  function initCostDisplay() {
+    const allTime = parseFloat(localStorage.getItem('aptnetwork_cost_alltime') || '0');
+    document.getElementById('cost-alltime').textContent = '$' + allTime.toFixed(4);
+  }
+
+  // ── State ──
+  let currentMode = 'marketing';
+  let selectedAudience = null;
+  let marketingFormat = 'email';
+  let customFormat = 'email';
+  let selectedStyle = 'professional';
+  let marketingCount = 3;
+  let customCount = 3;
+
+  // variations[i] = { html, label }
+  let variations = [];
+  let activeVariation = 0;
+
+  // ── Mode switching ──
+  function switchMode(mode) {
+    currentMode = mode;
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + mode).classList.add('active');
+    document.querySelectorAll('.mode-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + mode).classList.add('active');
+
+    const actionBar = document.getElementById('action-bar');
+    actionBar.style.display = mode === 'saved' ? 'none' : '';
+
+    if (mode === 'saved') {
+      // Clear variation tabs and preview when entering saved mode
+      document.getElementById('variation-tabs').innerHTML = '';
+      document.getElementById('save-btn').style.display = 'none';
+      document.getElementById('copy-btn').style.display = 'none';
+      document.getElementById('send-btn').style.display = 'none';
+      document.getElementById('download-btn').style.display = 'none';
+      document.getElementById('mailforge-save-btn').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+      const frame = document.getElementById('preview-frame');
+      const doc = frame.contentDocument || frame.contentWindow.document;
+      doc.open(); doc.write(''); doc.close();
+      renderSavedList();
+      setStatus('ready', 'Browse your saved templates — click Preview to view');
+    } else {
+      setStatus('ready', mode === 'marketing' ? 'Select an audience to get started' : 'Paste your content to get started');
+    }
+  }
+
+  // ── Audience ──
+  function selectAudience(card) {
+    document.querySelectorAll('.audience-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedAudience = card.dataset.audience;
+    hideError();
+  }
+
+  // ── Format ──
+  function selectFormat(btn, mode) {
+    const row = btn.closest('.toggle-row');
+    row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    if (mode === 'marketing') marketingFormat = btn.dataset.format;
+    else customFormat = btn.dataset.format;
+  }
+
+  // ── Style ──
+  function selectStyle(card) {
+    document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedStyle = card.dataset.style;
+  }
+
+  // ── Count ──
+  function selectCount(btn, mode) {
+    const row = btn.closest('.toggle-row');
+    row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    if (mode === 'marketing') marketingCount = parseInt(btn.dataset.count);
+    else customCount = parseInt(btn.dataset.count);
+  }
+
+  // ── Helpers ──
+  function setVal(id, val) {
+    document.getElementById(id).value = val;
+    document.getElementById(id).focus();
+  }
+
+  function setStatus(type, text) {
+    document.getElementById('status-dot').className = 'status-dot ' + type;
+    document.getElementById('status-text').textContent = text;
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-general');
+    el.textContent = msg; el.style.display = 'block';
+    setStatus('error', 'Error');
+  }
+  function hideError() {
+    document.getElementById('error-general').style.display = 'none';
+    document.getElementById('error-marketing').style.display = 'none';
+    document.getElementById('error-custom').style.display = 'none';
+  }
+
+  // ── View ──
+  function switchView(view, btn) {
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('preview-frame').style.display = view === 'preview' ? 'block' : 'none';
+    document.getElementById('code-view').style.display = view === 'code' ? 'block' : 'none';
+  }
+
+  // ── Render variation into preview ──
+  function renderVariation(index) {
+    activeVariation = index;
+    const v = variations[index];
+    if (!v) return;
+
+    const frame = document.getElementById('preview-frame');
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(v.html); doc.close();
+    // Force all links to open in new tab so preview doesn't navigate away
+    frame.contentWindow.addEventListener('click', function(e) {
+      const a = e.target.closest('a');
+      if (a && a.href) { e.preventDefault(); window.open(a.href, '_blank'); }
+    });
+    document.getElementById('code-content').textContent = v.html;
+
+    // update variation tab highlights
+    document.querySelectorAll('.var-tab').forEach((t, i) => {
+      t.classList.toggle('active', i === index);
+    });
+
+    // update save button state
+    const saveBtn = document.getElementById('save-btn');
+    if (v.saved) {
+      saveBtn.classList.add('saved');
+      saveBtn.textContent = '✅ Saved';
+    } else {
+      saveBtn.classList.remove('saved');
+      saveBtn.textContent = '💾 Save';
+    }
+  }
+
+  function buildVariationTabs(count) {
+    const container = document.getElementById('variation-tabs');
+    container.innerHTML = '';
+    if (count <= 1) return;
+    for (let i = 0; i < count; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'var-tab' + (i === 0 ? ' active' : '');
+      btn.textContent = 'Option ' + (i + 1);
+      btn.onclick = () => renderVariation(i);
+      btn.id = 'var-tab-' + i;
+      container.appendChild(btn);
+    }
+  }
+
+  function updateVariationTab(index, saved) {
+    const tab = document.getElementById('var-tab-' + index);
+    if (tab) tab.classList.toggle('saved-dot', saved);
+  }
+
+  // ── Generate ──
+  async function generate() {
+    hideError();
+
+    const mode = currentMode;
+    const count = mode === 'marketing' ? marketingCount : customCount;
+
+    // Build base payload
+    let basePayload = { mode };
+    if (mode === 'marketing') {
+      if (!selectedAudience) { showError('Please select an audience first.'); return; }
+      basePayload.audience = selectedAudience;
+      basePayload.format = marketingFormat;
+      basePayload.colors = document.getElementById('marketing-colors').value.trim();
+      basePayload.details = document.getElementById('marketing-details').value.trim();
+    } else {
+      const content = document.getElementById('custom-content').value.trim();
+      if (!content) { showError('Please enter some content first.'); return; }
+      basePayload.content = content;
+      basePayload.format = customFormat;
+      basePayload.style = selectedStyle;
+      basePayload.colors = document.getElementById('custom-colors').value.trim();
+      basePayload.instructions = document.getElementById('custom-instructions').value.trim();
+    }
+
+    // Add count — all variations in ONE API call
+    basePayload.count = count;
+
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.querySelector('.btn-text').textContent = count > 1 ? `Generating ${count} options...` : 'Generating...';
+    setStatus('loading', count > 1 ? `Generating ${count} variations in 1 call...` : 'Generating template...');
+    document.getElementById('empty-state').style.display = 'none';
+
+    // Hide toolbar actions while loading
+    document.getElementById('save-btn').style.display = 'none';
+    document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('download-btn').style.display = 'none';
+
+    try {
+      // Single API call for all variations
+      const response = await fetch('/api/ai-templates/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(basePayload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Server error');
+
+      // Track cost
+      if (data.usage) trackCost(data.usage);
+
+      // Store variations from single response
+      variations = (data.variations || [data.html]).map((html, i) => ({
+        html: html || '',
+        label: null,
+        saved: false,
+        meta: buildMeta(mode, i)
+      }));
+
+      activeVariation = 0;
+      buildVariationTabs(count);
+      renderVariation(0);
+
+      document.getElementById('save-btn').style.display = 'flex';
+      document.getElementById('copy-btn').style.display = 'flex';
+      document.getElementById('send-btn').style.display = 'flex';
+      document.getElementById('download-btn').style.display = 'flex';
+      document.getElementById('mailforge-save-btn').style.display = 'flex';
+
+      const successMsg = count > 1
+        ? `${count} variations ready — click tabs above to compare`
+        : 'Template generated!';
+      setStatus('success', successMsg);
+
+    } catch (err) {
+      showError('Error: ' + err.message);
+      document.getElementById('empty-state').style.display = 'flex';
+    } finally {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.querySelector('.btn-text').textContent = '✨ Generate';
+    }
+  }
+
+  function buildMeta(mode, index) {
+    const audienceMap = {
+      leasing_agent: 'Leasing Agent', property_manager: 'Property Manager',
+      regional_manager: 'Regional Manager', realtor_locator: 'Apartment Agent'
+    };
+    if (mode === 'marketing') {
+      return `${audienceMap[selectedAudience] || ''} · ${marketingFormat}`;
+    }
+    return `Custom ${customFormat} · ${selectedStyle}`;
+  }
+
+  // ── Reset ──
+  function resetAll() {
+    document.querySelectorAll('.audience-card').forEach(c => c.classList.remove('selected'));
+    selectedAudience = null;
+
+    // Reset format toggles to defaults
+    document.querySelectorAll('#panel-marketing .toggle-row').forEach((row, i) => {
+      row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+      row.querySelector('.toggle-btn').classList.add('selected');
+    });
+    document.querySelectorAll('#panel-custom .toggle-row').forEach((row, i) => {
+      row.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+      row.querySelector('.toggle-btn').classList.add('selected');
+    });
+
+    marketingFormat = 'email'; customFormat = 'flyer';
+    marketingCount = 1; customCount = 1;
+
+    document.getElementById('marketing-colors').value = '';
+    document.getElementById('marketing-details').value = '';
+    document.getElementById('custom-content').value = '';
+    document.getElementById('custom-colors').value = '';
+    document.getElementById('custom-instructions').value = '';
+
+    document.querySelectorAll('.style-card').forEach(c => c.classList.remove('selected'));
+    document.querySelector('.style-card[data-style="professional"]').classList.add('selected');
+    selectedStyle = 'professional';
+
+    variations = [];
+    document.getElementById('variation-tabs').innerHTML = '';
+    document.getElementById('preview-frame').srcdoc = '';
+    document.getElementById('code-content').textContent = '';
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('save-btn').style.display = 'none';
+    document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('download-btn').style.display = 'none';
+
+    hideError();
+    setStatus('ready', 'Cleared — ready to start over');
+  }
+
+  // ── Copy / Download ──
+  function copyHTML() {
+    const v = variations[activeVariation];
+    if (!v) return;
+    navigator.clipboard.writeText(v.html).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.textContent = '✅ Copied!';
+      setTimeout(() => btn.innerHTML = '📋 Copy', 2000);
+    });
+  }
+
+  function downloadHTML() {
+    const v = variations[activeVariation];
+    if (!v) return;
+    const name = (v.label || `template-option-${activeVariation + 1}`).replace(/[^a-z0-9]/gi, '-').toLowerCase() + '.html';
+    const blob = new Blob([v.html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── Save Dialog ──
+  function openSaveDialog() {
+    const v = variations[activeVariation];
+    if (!v) return;
+    const input = document.getElementById('save-label-input');
+    input.value = v.label || suggestLabel();
+    document.getElementById('save-dialog').classList.add('open');
+    setTimeout(() => input.focus(), 50);
+  }
+
+  function closeSaveDialog() {
+    document.getElementById('save-dialog').classList.remove('open');
+  }
+
+  function suggestLabel() {
+    const audienceMap = {
+      leasing_agent: 'Leasing Agent', property_manager: 'Property Manager',
+      regional_manager: 'Regional Manager', realtor_locator: 'Apartment Agent'
+    };
+    const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (currentMode === 'marketing') {
+      return `${audienceMap[selectedAudience] || 'Marketing'} ${marketingFormat === 'flyer' ? 'Flyer' : 'Email'} – ${date}`;
+    }
+    return `Custom ${customFormat === 'flyer' ? 'Flyer' : 'Email'} – ${date}`;
+  }
+
+  function confirmSave() {
+    const label = document.getElementById('save-label-input').value.trim();
+    if (!label) { document.getElementById('save-label-input').focus(); return; }
+
+    const v = variations[activeVariation];
+    if (!v) return;
+    v.label = label;
+    v.saved = true;
+
+    // Save to localStorage
+    const saves = getSaved();
+    const id = Date.now().toString();
+    // Determine folder: marketing mode uses audience, custom mode uses 'custom'
+    const folder = (currentMode === 'marketing' && selectedAudience) ? selectedAudience : 'custom';
+    saves.unshift({
+      id,
+      label,
+      html: v.html,
+      meta: v.meta,
+      folder,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    });
+    localStorage.setItem('aptnetwork_templates', JSON.stringify(saves));
+
+    closeSaveDialog();
+    updateVariationTab(activeVariation, true);
+    updateSavedCount();
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.classList.add('saved');
+    saveBtn.textContent = '✅ Saved';
+
+    setStatus('success', `Saved as "${label}"`);
+  }
+
+  // ── Save to MailForge Templates library ──
+  async function saveToMailForge() {
+    const v = variations[activeVariation];
+    if (!v) return;
+    const label = prompt('Template name for MailForge:', v.label || suggestLabel());
+    if (!label) return;
+    const btn = document.getElementById('mailforge-save-btn');
+    btn.textContent = '⏳ Saving…';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: label,
+          category: currentMode === 'marketing' ? 'marketing' : 'custom',
+          subject: '',
+          html_body: v.html,
+          blocks: '[]',
+        })
+      });
+      if (res.ok) {
+        btn.textContent = '✅ Saved to MailForge!';
+        setStatus('success', `Saved "${label}" to MailForge Templates — find it under Templates in the sidebar.`);
+        setTimeout(() => { btn.textContent = '📥 Save to MailForge'; btn.disabled = false; }, 3000);
+      } else {
+        const d = await res.json();
+        setStatus('error', d.error || 'Failed to save to MailForge');
+        btn.textContent = '📥 Save to MailForge';
+        btn.disabled = false;
+      }
+    } catch (e) {
+      setStatus('error', 'Could not reach MailForge API');
+      btn.textContent = '📥 Save to MailForge';
+      btn.disabled = false;
+    }
+  }
+
+  // ── Saved Templates ──
+  function getSaved() {
+    try { return JSON.parse(localStorage.getItem('aptnetwork_templates') || '[]'); }
+    catch { return []; }
+  }
+
+  function updateSavedCount() {
+    const saves = getSaved();
+    const badge = document.getElementById('saved-count');
+    if (saves.length > 0) {
+      badge.textContent = saves.length;
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  let previewingSavedId = null;
+
+  const FOLDERS = [
+    { key: 'leasing_agent',    label: 'Leasing Agent / Team',  icon: '🏠' },
+    { key: 'property_manager', label: 'Property Manager',       icon: '👔' },
+    { key: 'regional_manager', label: 'Regional Manager',       icon: '📊' },
+    { key: 'realtor_locator',  label: 'Apartment Agent',        icon: '🔑' },
+    { key: 'custom',           label: 'Custom Content',         icon: '✏️' },
+  ];
+
+  // Track which folders are collapsed
+  const collapsedFolders = new Set();
+
+  function renderSavedList() {
+    const saves = getSaved();
+    const empty = document.getElementById('saved-empty');
+    const list = document.getElementById('saved-list');
+    list.innerHTML = '';
+    empty.style.display = saves.length === 0 ? 'block' : 'none';
+    if (saves.length === 0) return;
+
+    FOLDERS.forEach(folder => {
+      // Support old saves without folder field — guess from meta/label
+      const folderSaves = saves.filter(s => {
+        if (s.folder) return s.folder === folder.key;
+        // legacy fallback
+        const combined = (s.label + ' ' + (s.meta || '')).toLowerCase();
+        if (folder.key === 'leasing_agent')    return combined.includes('leasing');
+        if (folder.key === 'property_manager') return combined.includes('property manager');
+        if (folder.key === 'regional_manager') return combined.includes('regional');
+        if (folder.key === 'realtor_locator')  return combined.includes('agent') || combined.includes('realtor');
+        if (folder.key === 'custom')           return combined.includes('custom');
+        return false;
+      });
+      if (folderSaves.length === 0) return;
+
+      const isCollapsed = collapsedFolders.has(folder.key);
+
+      // Folder header
+      const header = document.createElement('div');
+      header.className = 'folder-header';
+      header.innerHTML = `
+        <span class="folder-icon">${folder.icon}</span>
+        <span class="folder-label">${folder.label}</span>
+        <span class="folder-count">${folderSaves.length}</span>
+        <span class="folder-chevron">${isCollapsed ? '▶' : '▼'}</span>`;
+      header.onclick = () => {
+        if (collapsedFolders.has(folder.key)) collapsedFolders.delete(folder.key);
+        else collapsedFolders.add(folder.key);
+        renderSavedList();
+      };
+      list.appendChild(header);
+
+      if (!isCollapsed) {
+        folderSaves.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'saved-item folder-item' + (previewingSavedId === s.id ? ' active-item' : '');
+          item.innerHTML = `
+            <div class="saved-item-info">
+              <div class="saved-item-label">${escHtml(s.label)}</div>
+              <div class="saved-item-meta">${escHtml(s.meta || '')} · ${s.date}</div>
+            </div>
+            <div class="saved-item-actions">
+              <button class="saved-action-btn" onclick="previewSaved('${s.id}',event)">👁 Preview</button>
+              <button class="saved-action-btn delete" onclick="deleteSaved('${s.id}',event)">🗑</button>
+            </div>`;
+          list.appendChild(item);
+        });
+      }
+    });
+  }
+
+  function previewSaved(id, e) {
+    e && e.stopPropagation();
+    const saves = getSaved();
+    const s = saves.find(x => x.id === id);
+    if (!s) return;
+
+    previewingSavedId = id;
+    renderSavedList();
+
+    // Show in preview pane
+    const frame = document.getElementById('preview-frame');
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(s.html); doc.close();
+    frame.contentWindow.addEventListener('click', function(e) {
+      const a = e.target.closest('a');
+      if (a && a.href) { e.preventDefault(); window.open(a.href, '_blank'); }
+    });
+    document.getElementById('code-content').textContent = s.html;
+    document.getElementById('empty-state').style.display = 'none';
+
+    // Show toolbar actions
+    variations = [{ html: s.html, label: s.label, saved: true, meta: s.meta }];
+    activeVariation = 0;
+    document.getElementById('variation-tabs').innerHTML = '';
+    document.getElementById('save-btn').style.display = 'none'; // already saved
+    document.getElementById('send-btn').style.display = 'flex';
+    document.getElementById('copy-btn').style.display = 'flex';
+    document.getElementById('download-btn').style.display = 'flex';
+
+    setStatus('success', `Previewing: ${s.label}`);
+  }
+
+  function deleteSaved(id, e) {
+    e && e.stopPropagation();
+    if (!confirm('Delete this saved template?')) return;
+    const saves = getSaved().filter(s => s.id !== id);
+    localStorage.setItem('aptnetwork_templates', JSON.stringify(saves));
+    if (previewingSavedId === id) previewingSavedId = null;
+    renderSavedList();
+    updateSavedCount();
+    setStatus('ready', 'Template deleted');
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Email Dialog ──
+  function openEmailDialog() {
+    const v = variations[activeVariation];
+    if (!v) return;
+
+    // Clear previous status
+    const status = document.getElementById('email-status');
+    status.style.display = 'none';
+    status.textContent = '';
+    document.getElementById('email-send-btn').disabled = false;
+    document.getElementById('email-send-btn').textContent = '✉️ Send Now';
+
+    // Auto-populate subject line — use saved label or build from current settings
+    if (v.label) {
+      document.getElementById('email-subject').value = v.label;
+    } else {
+      document.getElementById('email-subject').value = buildSubjectLine();
+    }
+
+    document.getElementById('email-dialog').classList.add('open');
+    setTimeout(() => document.getElementById('email-to').focus(), 50);
+  }
+
+  function buildSubjectLine() {
+    const audienceSubjects = {
+      leasing_agent:    'Fill Vacancies Faster — Connect with Active Apartment Agents',
+      property_manager: 'More Qualified Leads for Your Community — 30-Day Free Trial',
+      regional_manager: 'Grow Portfolio Occupancy with ApartmentNetwork.com — Try Free',
+      realtor_locator:  'Daily Rents, Second Chance Properties & More — Free Access'
+    };
+    const details = document.getElementById('marketing-details')?.value.trim();
+    const theme = details ? ` | ${details.split(/[—\-,.]/)[0].trim()}` : '';
+
+    if (currentMode === 'marketing' && selectedAudience) {
+      return (audienceSubjects[selectedAudience] || 'ApartmentNetwork.com — Join Our Network') + theme;
+    }
+
+    // Custom mode — use first line of content as subject hint
+    const content = document.getElementById('custom-content')?.value.trim() || '';
+    const firstLine = content.split('\n')[0].replace(/^[•\-\*]\s*/, '').trim();
+    return firstLine.length > 8 ? firstLine.substring(0, 80) : 'ApartmentNetwork.com — Important Update';
+  }
+
+  function closeEmailDialog() {
+    document.getElementById('email-dialog').classList.remove('open');
+  }
+
+  async function sendEmail() {
+    const to = document.getElementById('email-to').value.trim();
+    const subject = document.getElementById('email-subject').value.trim();
+    const fromName = document.getElementById('email-fromname').value.trim();
+    const statusEl = document.getElementById('email-status');
+    const sendBtn = document.getElementById('email-send-btn');
+
+    if (!to) { showEmailStatus('error', 'Please enter at least one recipient.'); return; }
+    if (!subject) { showEmailStatus('error', 'Please enter a subject line.'); return; }
+
+    const v = variations[activeVariation];
+    if (!v) return;
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    showEmailStatus('loading', 'Sending email...');
+
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject, html: v.html, fromName })
+      });
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Send failed');
+
+      const count = data.recipients || 1;
+      showEmailStatus('success', `✅ Sent to ${count} recipient${count > 1 ? 's' : ''}!`);
+      sendBtn.textContent = '✅ Sent!';
+      setStatus('success', `Email sent to ${to}`);
+
+      // Auto-close after 2 seconds on success
+      setTimeout(() => closeEmailDialog(), 2500);
+
+    } catch (err) {
+      showEmailStatus('error', '❌ ' + err.message);
+      sendBtn.disabled = false;
+      sendBtn.textContent = '✉️ Send Now';
+    }
+  }
+
+  function showEmailStatus(type, msg) {
+    const el = document.getElementById('email-status');
+    el.style.display = 'block';
+    el.textContent = msg;
+    el.style.background = type === 'success' ? '#f0fdf4' : type === 'error' ? '#fef2f2' : '#fffbeb';
+    el.style.border = `1px solid ${type === 'success' ? '#bbf7d0' : type === 'error' ? '#fecaca' : '#fde68a'}`;
+    el.style.color = type === 'success' ? '#15803d' : type === 'error' ? '#dc2626' : '#92400e';
+  }
+
+  document.getElementById('email-dialog').addEventListener('click', function(e) {
+    if (e.target === this) closeEmailDialog();
+  });
+
+  // Close dialog on overlay click
+  document.getElementById('save-dialog').addEventListener('click', function(e) {
+    if (e.target === this) closeSaveDialog();
+  });
+
+  // Save on Enter in dialog input
+  document.getElementById('save-label-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') confirmSave();
+    if (e.key === 'Escape') closeSaveDialog();
+  });
+
+  // ── Style Previews ──
+  const STYLE_EXAMPLES = {
+    professional: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#0d1f33;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0d1f33"><tr><td align="center" style="padding:24px 12px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td bgcolor="#0d1f33" style="padding:48px 40px 32px;border-top:4px solid #d4a017;">
+  <p style="font-family:Arial,Helvetica,sans-serif;font-size:11px;letter-spacing:5px;color:#d4a017;text-transform:uppercase;margin:0 0 16px;">✦ Professional Style ✦</p>
+  <h1 style="font-family:Arial,Helvetica,sans-serif;font-size:42px;color:#ffffff;font-weight:bold;margin:0 0 16px;line-height:1.1;">CLEAN.<br><span style="color:#d4a017;">POLISHED.</span><br>TRUSTED.</h1>
+  <p style="font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#a0b4c8;margin:0;">Dark navy background, gold accents, bold hierarchy. Looks like a Fortune 500 company sent it.</p>
+</td></tr>
+<tr><td bgcolor="#0a1828" style="padding:28px 40px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td style="padding:12px 0;border-bottom:1px solid #1e3a5a;"><span style="font-family:Arial,Helvetica,sans-serif;font-size:22px;color:#d4a017;">✦</span>&nbsp;<span style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#ffffff;font-weight:bold;">Benefit One</span><br><span style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#7a9ab5;">Clean supporting copy goes here in a readable size.</span></td></tr>
+    <tr><td style="padding:12px 0;border-bottom:1px solid #1e3a5a;"><span style="font-family:Arial,Helvetica,sans-serif;font-size:22px;color:#d4a017;">✦</span>&nbsp;<span style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#ffffff;font-weight:bold;">Benefit Two</span><br><span style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#7a9ab5;">Structured, trustworthy, easy to scan.</span></td></tr>
+  </table>
+</td></tr>
+<tr><td align="center" bgcolor="#0a1828" style="padding:24px 40px 40px;">
+  <table cellpadding="0" cellspacing="0"><tr><td bgcolor="#d4a017" style="border-radius:6px;">
+    <a href="#" style="display:inline-block;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:#0d1f33;padding:16px 40px;text-decoration:none;letter-spacing:1px;text-transform:uppercase;">Get Started Today →</a>
+  </td></tr></table>
+</td></tr>
+<tr><td bgcolor="#061018" align="center" style="padding:20px;border-top:2px solid #d4a017;">
+  <p style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#4a6a85;margin:0;">ApartmentNetwork.com &nbsp;|&nbsp; info@aptnetwork.com</p>
+  <p style="font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#2a4a65;margin:8px 0 0;">You received this email because you are a member of ApartmentNetwork.com. <a href="#" style="color:#2a4a65;">Opt out of future emails</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`,
+
+    bold: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#111111;font-family:Trebuchet MS,Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#111111"><tr><td align="center" style="padding:24px 12px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td bgcolor="#111111" style="padding:48px 40px 32px;border-top:4px solid #f0b429;">
+  <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:11px;letter-spacing:6px;color:#f0b429;text-transform:uppercase;margin:0 0 16px;">🔥 Bold Style 🔥</p>
+  <h1 style="font-family:Trebuchet MS,Arial,sans-serif;font-size:58px;color:#ffffff;font-weight:bold;margin:0 0 16px;line-height:1.0;letter-spacing:-2px;">THIS<br><span style="color:#f0b429;">DEMANDS</span><br>ATTENTION.</h1>
+  <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:16px;color:#999999;margin:0;">Near-black background, electric gold highlights. Massive headlines. Maximum visual impact.</p>
+</td></tr>
+<tr><td bgcolor="#1a1a1a" style="padding:28px 40px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td bgcolor="#222222" style="padding:16px 20px;border-left:4px solid #f0b429;margin-bottom:10px;display:block;">
+      <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:18px;color:#ffffff;font-weight:bold;margin:0;">→ BOLD BENEFIT ONE</p>
+      <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:13px;color:#888888;margin:4px 0 0;">High contrast, high energy copy.</p>
+    </td></tr>
+    <tr><td style="padding:8px 0;"></td></tr>
+    <tr><td bgcolor="#222222" style="padding:16px 20px;border-left:4px solid #f0b429;">
+      <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:18px;color:#ffffff;font-weight:bold;margin:0;">→ BOLD BENEFIT TWO</p>
+      <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:13px;color:#888888;margin:4px 0 0;">Built for people who want results fast.</p>
+    </td></tr>
+  </table>
+</td></tr>
+<tr><td align="center" bgcolor="#1a1a1a" style="padding:24px 40px 40px;">
+  <table cellpadding="0" cellspacing="0"><tr><td bgcolor="#f0b429" style="border-radius:4px;">
+    <a href="#" style="display:inline-block;font-family:Trebuchet MS,Arial,sans-serif;font-size:16px;font-weight:bold;color:#111111;padding:18px 48px;text-decoration:none;letter-spacing:2px;text-transform:uppercase;">ACT NOW →</a>
+  </td></tr></table>
+</td></tr>
+<tr><td bgcolor="#0a0a0a" align="center" style="padding:20px;border-top:2px solid #f0b429;">
+  <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:12px;color:#444444;margin:0;">ApartmentNetwork.com &nbsp;|&nbsp; info@aptnetwork.com</p>
+  <p style="font-family:Trebuchet MS,Arial,sans-serif;font-size:10px;color:#333333;margin:8px 0 0;">You received this email because you are a member of ApartmentNetwork.com. <a href="#" style="color:#333333;">Opt out of future emails</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`,
+
+    elegant: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#1a1a2e;font-family:Georgia,serif;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#1a1a2e"><tr><td align="center" style="padding:24px 12px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td bgcolor="#1a1a2e" style="padding:56px 48px 36px;border-top:2px solid #c9a96e;">
+  <p style="font-family:Georgia,serif;font-size:11px;letter-spacing:6px;color:#c9a96e;text-transform:uppercase;margin:0 0 24px;text-align:center;">✦ Elegant Style ✦</p>
+  <h1 style="font-family:Georgia,serif;font-size:38px;color:#f0ece4;font-weight:normal;margin:0 0 20px;line-height:1.2;text-align:center;font-style:italic;">Refined. Understated.<br><span style="color:#c9a96e;font-style:normal;font-weight:bold;">Luxury.</span></h1>
+  <p style="font-family:Georgia,serif;font-size:15px;color:#8a8090;margin:0;text-align:center;line-height:1.7;">Deep charcoal background, rose gold accents, generous whitespace. The kind of email that feels expensive.</p>
+</td></tr>
+<tr><td align="center" bgcolor="#141424" style="padding:4px 48px 8px;">
+  <table width="80%" cellpadding="0" cellspacing="0"><tr><td style="border-top:1px solid #2e2a3e;font-size:0;">&nbsp;</td></tr></table>
+</td></tr>
+<tr><td bgcolor="#141424" style="padding:28px 48px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="50%" valign="top" style="padding:0 16px 0 0;">
+        <p style="font-family:Georgia,serif;font-size:13px;color:#c9a96e;letter-spacing:2px;text-transform:uppercase;margin:0 0 8px;">◆ Benefit One</p>
+        <p style="font-family:Georgia,serif;font-size:13px;color:#7a7080;margin:0;line-height:1.6;">Refined copy with ample breathing room and classic serif typography.</p>
+      </td>
+      <td width="50%" valign="top" style="padding:0 0 0 16px;border-left:1px solid #2e2a3e;">
+        <p style="font-family:Georgia,serif;font-size:13px;color:#c9a96e;letter-spacing:2px;text-transform:uppercase;margin:0 0 8px;">◆ Benefit Two</p>
+        <p style="font-family:Georgia,serif;font-size:13px;color:#7a7080;margin:0;line-height:1.6;">Every detail considered. Nothing superfluous.</p>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+<tr><td align="center" bgcolor="#141424" style="padding:24px 48px 48px;">
+  <table cellpadding="0" cellspacing="0"><tr><td style="border:1px solid #c9a96e;border-radius:2px;">
+    <a href="#" style="display:inline-block;font-family:Georgia,serif;font-size:13px;color:#c9a96e;padding:14px 40px;text-decoration:none;letter-spacing:3px;text-transform:uppercase;">Discover More</a>
+  </td></tr></table>
+</td></tr>
+<tr><td bgcolor="#0f0f1e" align="center" style="padding:20px;border-top:1px solid #c9a96e;">
+  <p style="font-family:Georgia,serif;font-size:11px;color:#3a3545;margin:0;letter-spacing:1px;">APARTMENTNETWORK.COM &nbsp;·&nbsp; INFO@APTNETWORK.COM</p>
+  <p style="font-family:Georgia,serif;font-size:10px;color:#2a2535;margin:8px 0 0;">You received this email because you are a member of ApartmentNetwork.com. <a href="#" style="color:#2a2535;">Opt out of future emails</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`,
+
+    fun: `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#1a0533;font-family:Verdana,Geneva,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" bgcolor="#1a0533"><tr><td align="center" style="padding:24px 12px;">
+<table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+<tr><td bgcolor="#2d0a52" style="padding:48px 40px 32px;border-top:4px solid #ffd700;">
+  <p style="font-family:Verdana,Geneva,sans-serif;font-size:11px;letter-spacing:4px;color:#ffd700;text-transform:uppercase;margin:0 0 16px;text-align:center;">🎉 Fun & Festive Style 🎉</p>
+  <h1 style="font-family:Verdana,Geneva,sans-serif;font-size:42px;color:#ffffff;font-weight:bold;margin:0 0 16px;line-height:1.1;text-align:center;">LET'S<br><span style="color:#ffd700;">CELEBRATE!</span> 🥳</h1>
+  <p style="font-family:Verdana,Geneva,sans-serif;font-size:15px;color:#c9a8e8;margin:0;text-align:center;line-height:1.6;">Vibrant deep purple, bright gold, festive energy. Perfect for events, parties, and special offers.</p>
+</td></tr>
+<tr><td bgcolor="#220840" style="padding:28px 40px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td width="48%" align="center" bgcolor="#2d0a52" style="padding:20px;border-radius:8px;border:2px solid #ffd700;">
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:28px;margin:0;">🌟</p>
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:13px;color:#ffd700;font-weight:bold;margin:8px 0 4px;">Special Offer</p>
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:11px;color:#c9a8e8;margin:0;">Exciting copy that pops!</p>
+      </td>
+      <td width="4%"></td>
+      <td width="48%" align="center" bgcolor="#2d0a52" style="padding:20px;border-radius:8px;border:2px solid #ff6eb4;">
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:28px;margin:0;">🎊</p>
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:13px;color:#ff6eb4;font-weight:bold;margin:8px 0 4px;">Join the Fun</p>
+        <p style="font-family:Verdana,Geneva,sans-serif;font-size:11px;color:#c9a8e8;margin:0;">Warm, welcoming energy.</p>
+      </td>
+    </tr>
+  </table>
+</td></tr>
+<tr><td align="center" bgcolor="#220840" style="padding:24px 40px 40px;">
+  <table cellpadding="0" cellspacing="0"><tr><td bgcolor="#ffd700" style="border-radius:30px;">
+    <a href="#" style="display:inline-block;font-family:Verdana,Geneva,sans-serif;font-size:15px;font-weight:bold;color:#1a0533;padding:16px 44px;text-decoration:none;letter-spacing:1px;">🎉 Count Me In!</a>
+  </td></tr></table>
+</td></tr>
+<tr><td bgcolor="#110022" align="center" style="padding:20px;border-top:2px solid #ffd700;">
+  <p style="font-family:Verdana,Geneva,sans-serif;font-size:12px;color:#4a2a6a;margin:0;">ApartmentNetwork.com &nbsp;|&nbsp; info@aptnetwork.com</p>
+  <p style="font-family:Verdana,Geneva,sans-serif;font-size:10px;color:#3a1a5a;margin:8px 0 0;">You received this email because you are a member of ApartmentNetwork.com. <a href="#" style="color:#3a1a5a;">Opt out of future emails</a></p>
+</td></tr>
+</table></td></tr></table></body></html>`
+  };
+
+  function previewStyle(e, style) {
+    e.stopPropagation();
+    const html = STYLE_EXAMPLES[style];
+    if (!html) return;
+
+    document.getElementById('empty-state').style.display = 'none';
+    const frame = document.getElementById('preview-frame');
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    frame.contentWindow.addEventListener('click', function(ev) {
+      const a = ev.target.closest('a');
+      if (a && a.href) { ev.preventDefault(); }
+    });
+
+    document.getElementById('variation-tabs').innerHTML = '';
+    document.getElementById('save-btn').style.display = 'none';
+    document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('send-btn').style.display = 'none';
+    document.getElementById('download-btn').style.display = 'none';
+    setStatus('ready', 'Style preview — click Generate to create a real template in this style');
+  }
+
+  // Init
+  updateSavedCount();
+  initCostDisplay();
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+═══════════════════════════════════════════════════
+  MAILFORGE — Your Email Marketing App
+  Built with Next.js + Postmark API
+═══════════════════════════════════════════════════
+
+FIRST-TIME SETUP
+─────────────────
+1. Open a terminal in this folder:
+   cd "email-marketing-app"
+
+2. Install dependencies (already done):
+   npm install
+
+3. Start the app:
+   npm run dev
+
+4. Open your browser to:
+   http://localhost:3000
+
+5. Register your account (first user becomes admin)
+
+6. Go to Settings → Enter your Postmark API key
+   Get one free at: https://postmarkapp.com
+
+DAILY USE
+──────────
+To start:   npm run dev
+To stop:    Ctrl+C in the terminal
+
+POSTMARK SETUP (required to send emails)
+─────────────────────────────────────────
+1. Create a free Postmark account at postmarkapp.com
+2. Create a "Server" in Postmark
+3. Go to API Tokens → copy your Server API Token
+4. In MailForge Settings → paste the token
+5. Set your Sender Email (must be verified in Postmark)
+6. For tracking: In Postmark → Webhooks → Add:
+   http://YOUR-IP:3000/api/webhooks/postmark
+   (Enable: Open, Click, Bounce, Delivery, SpamComplaint, SubscriptionChange)
+
+FEATURES
+─────────
+✓ Contact management with CSV import/export
+✓ Contact lists (organize subscribers)
+✓ Email campaign builder (visual + HTML editor)
+✓ Drag-and-drop email blocks (header, text, image, button, etc.)
+✓ Test send before sending to your list
+✓ Campaign analytics (open rate, click rate, bounces)
+✓ Sign-up forms with embeddable code
+✓ Automation workflows
+✓ Multi-user support
+✓ Unsubscribe handling (CAN-SPAM compliant)
+✓ Postmark webhook integration for real-time stats
+
+DATA
+─────
+Your database is stored at: data/app.db
+Back it up regularly!
+
+EMAIL PERSONALIZATION
+──────────────────────
+Use these tags in your email content:
+  {{first_name}}  - Contact's first name
+  {{last_name}}   - Contact's last name
+  {{email}}       - Contact's email address
+  {{full_name}}   - First + Last name

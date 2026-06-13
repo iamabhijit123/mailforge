@@ -1,0 +1,35 @@
+import { NextRequest, NextResponse } from 'next/server'
+import bcrypt from 'bcryptjs'
+import { getDb } from '@/lib/db'
+import { signToken, COOKIE_NAME } from '@/lib/auth'
+
+export async function POST(req: NextRequest) {
+  const { name, email, password } = await req.json()
+  if (!name || !email || !password) return NextResponse.json({ error: 'All fields required' }, { status: 400 })
+  if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+
+  const db = getDb()
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase().trim())
+  if (existing) return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 })
+
+  const id = crypto.randomUUID()
+  const hash = await bcrypt.hash(password, 12)
+  const isFirst = (db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c === 0
+
+  db.prepare('INSERT INTO users (id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?)').run(
+    id, email.toLowerCase().trim(), name.trim(), hash, isFirst ? 'admin' : 'member'
+  )
+  db.prepare('INSERT INTO settings (user_id) VALUES (?)').run(id)
+
+  const token = await signToken({ id, email: email.toLowerCase().trim(), name: name.trim(), role: isFirst ? 'admin' : 'member' })
+
+  const res = NextResponse.json({ ok: true })
+  res.cookies.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 30,
+    path: '/',
+  })
+  return res
+}
