@@ -49,7 +49,7 @@ export default function AiTemplateMakerPage() {
 
       {/* Full-height iframe */}
       <iframe
-        src="/template-maker/"
+        src="/template-maker/index.html"
         title="AI Template Maker"
         className="flex-1 w-full border-0"
         allow="clipboard-write"

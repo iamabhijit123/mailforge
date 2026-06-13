@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-import { Button, Input, Toast } from '@/components/ui'
-import { ArrowLeft, Save } from 'lucide-react'
+import { useParams } from 'next/navigation'
+import { Button, Input, Modal, Toast } from '@/components/ui'
+import { ArrowLeft, Save, FlaskConical } from 'lucide-react'
 import Link from 'next/link'
 import { EmailBuilder } from '@/components/email-builder/EmailBuilder'
 import { EmailBlock } from '@/lib/email-html'
@@ -13,12 +13,14 @@ interface Template { id: string; name: string; subject: string | null; blocks: s
 
 export default function EditTemplatePage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const [template, setTemplate] = useState<Template | null>(null)
   const [blocks, setBlocks] = useState<EmailBlock[]>([])
   const [htmlBody, setHtmlBody] = useState('')
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showTest, setShowTest] = useState(false)
+  const [testEmail, setTestEmail] = useState('')
+  const [testSending, setTestSending] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
@@ -34,6 +36,19 @@ export default function EditTemplatePage() {
     setBlocks(newBlocks)
     setHtmlBody(html)
   }, [])
+
+  async function sendTest() {
+    if (!testEmail) return
+    setTestSending(true)
+    const res = await fetch(`/api/templates/${id}/test`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to_email: testEmail }),
+    })
+    setTestSending(false)
+    const data = await res.json()
+    if (res.ok) { setShowTest(false); setToast({ msg: `Test sent to ${testEmail}`, type: 'success' }) }
+    else setToast({ msg: data.error || 'Failed to send test', type: 'error' })
+  }
 
   async function save() {
     setSaving(true)
@@ -57,12 +72,24 @@ export default function EditTemplatePage() {
           <Link href="/templates" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-4 h-4" /></Link>
           <Input value={name} onChange={e => setName(e.target.value)} className="w-64 border-transparent hover:border-gray-300 focus:border-brand-400" />
         </div>
+        <Button variant="secondary" size="sm" onClick={() => setShowTest(true)}><FlaskConical className="w-3.5 h-3.5" /> Test</Button>
         <Button size="sm" onClick={save} loading={saving}><Save className="w-3.5 h-3.5" /> Save Template</Button>
       </div>
 
       <div className="flex-1 overflow-hidden">
         <EmailBuilder key={id} blocks={blocks} initialHtml={template.html_body || ''} onChange={handleChange} />
       </div>
+
+      <Modal open={showTest} onClose={() => setShowTest(false)} title="Send Test Email" size="sm">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">Send a test of this template to preview how it looks in an inbox.</p>
+          <Input label="Send to" type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="your@email.com" autoFocus />
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={sendTest} loading={testSending}><FlaskConical className="w-3.5 h-3.5" /> Send Test</Button>
+            <Button variant="secondary" onClick={() => setShowTest(false)}>Cancel</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }

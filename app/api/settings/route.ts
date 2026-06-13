@@ -7,7 +7,11 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
   const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(session.id) as Record<string, unknown> | undefined
-  return NextResponse.json(settings || {})
+  const merged = { ...(settings || {}) }
+  // Fall back to env vars if not yet saved by user
+  if (!merged.postmark_api_key) merged.postmark_api_key = process.env.POSTMARK_API_KEY || ''
+  if (!merged.anthropic_api_key) merged.anthropic_api_key = process.env.ANTHROPIC_API_KEY || ''
+  return NextResponse.json(merged)
 }
 
 export async function PUT(req: NextRequest) {

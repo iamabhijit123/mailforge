@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button, Badge, Modal, Input, Toast } from '@/components/ui'
-import { Plus, FileText, Edit2, Trash2, LayersIcon, Clock, Send, Sparkles, LayoutTemplate } from 'lucide-react'
+import { Plus, FileText, Edit2, Trash2, LayersIcon, Clock, Send, Sparkles, LayoutTemplate, FlaskConical, X } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
 
@@ -14,9 +14,18 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Create modal state
   const [showCreateType, setShowCreateType] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'custom', subject: '' })
+
+  // Preview modal state
+  const [previewTpl, setPreviewTpl] = useState<Template | null>(null)
+  const [testEmail, setTestEmail] = useState('')
+  const [testSending, setTestSending] = useState(false)
+  const [showTestForm, setShowTestForm] = useState(false)
+
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   async function load() {
@@ -50,6 +59,29 @@ export default function TemplatesPage() {
     await fetch(`/api/template-groups/${id}`, { method: 'DELETE' })
     load()
     setToast({ msg: 'Group deleted', type: 'success' })
+  }
+
+  async function sendTest() {
+    if (!testEmail || !previewTpl) return
+    setTestSending(true)
+    const res = await fetch(`/api/templates/${previewTpl.id}/test`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to_email: testEmail }),
+    })
+    setTestSending(false)
+    const data = await res.json()
+    if (res.ok) {
+      setShowTestForm(false)
+      setToast({ msg: `Test sent to ${testEmail}`, type: 'success' })
+    } else {
+      setToast({ msg: data.error || 'Failed to send test', type: 'error' })
+    }
+  }
+
+  function openPreview(t: Template) {
+    setPreviewTpl(t)
+    setShowTestForm(false)
+    setTestEmail('')
   }
 
   const userTemplates = templates.filter(t => !t.is_system)
@@ -138,15 +170,18 @@ export default function TemplatesPage() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {userTemplates.map(t => (
-                  <div key={t.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                    <TemplatePreviewThumbnail html={t.html_body} height={140} />
+                  <div key={t.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col group">
+                    {/* Clickable preview */}
+                    <div className="cursor-pointer" onClick={() => openPreview(t)}>
+                      <TemplatePreviewThumbnail html={t.html_body} height={140} />
+                    </div>
                     <div className="p-4 flex flex-col gap-2 flex-1">
                       <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-gray-900 truncate">{t.name}</h3>
+                        <div className="min-w-0 cursor-pointer" onClick={() => openPreview(t)}>
+                          <h3 className="font-semibold text-gray-900 truncate hover:text-brand-600">{t.name}</h3>
                           <Badge variant="default" className="mt-1">{t.category}</Badge>
                         </div>
-                        <div className="flex gap-1 flex-shrink-0">
+                        <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
                           <Link href={`/templates/${t.id}/edit`} className="p-1 text-gray-400 hover:text-brand-600"><Edit2 className="w-4 h-4" /></Link>
                           <button onClick={() => deleteTemplate(t.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                         </div>
@@ -158,6 +193,77 @@ export default function TemplatesPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Template Preview Modal ── */}
+      {previewTpl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '90vh' }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{previewTpl.name}</h2>
+                {previewTpl.subject && <p className="text-sm text-gray-500 mt-0.5">{previewTpl.subject}</p>}
+              </div>
+              <button onClick={() => setPreviewTpl(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Email preview */}
+              <div className="flex-1 overflow-auto bg-gray-100 p-4">
+                <iframe
+                  srcDoc={previewTpl.html_body || '<p style="font-family:sans-serif;color:#999;padding:40px;text-align:center">No preview available</p>'}
+                  title="Template Preview"
+                  className="w-full max-w-2xl mx-auto block border-0 bg-white shadow rounded"
+                  style={{ minHeight: 500 }}
+                  sandbox="allow-same-origin"
+                />
+              </div>
+
+              {/* Action panel */}
+              <div className="w-56 flex-shrink-0 border-l bg-gray-50 p-4 flex flex-col gap-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</p>
+
+                <Link href={`/templates/${previewTpl.id}/edit`}>
+                  <Button variant="outline" size="sm" className="w-full"><Edit2 className="w-3.5 h-3.5" /> Edit Template</Button>
+                </Link>
+
+                <Link href={`/campaigns/new?template_id=${previewTpl.id}`}>
+                  <Button variant="secondary" size="sm" className="w-full"><Send className="w-3.5 h-3.5" /> Create Campaign</Button>
+                </Link>
+
+                <hr className="border-gray-200" />
+
+                {!showTestForm ? (
+                  <Button size="sm" className="w-full" onClick={() => setShowTestForm(true)}>
+                    <FlaskConical className="w-3.5 h-3.5" /> Send Test Email
+                  </Button>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      label="Send test to"
+                      type="email"
+                      value={testEmail}
+                      onChange={e => setTestEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      autoFocus
+                    />
+                    <Button size="sm" className="w-full" onClick={sendTest} loading={testSending}>
+                      <FlaskConical className="w-3.5 h-3.5" /> Send
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-full" onClick={() => setShowTestForm(false)}>Cancel</Button>
+                  </div>
+                )}
+
+                <hr className="border-gray-200 mt-auto" />
+                <p className="text-xs text-gray-400">{formatDate(previewTpl.created_at)}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}

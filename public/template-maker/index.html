@@ -622,8 +622,8 @@
       <div class="mode-panel" id="panel-saved">
         <div id="saved-list-container">
           <div class="saved-empty" id="saved-empty">
-            <div class="saved-empty-icon">💾</div>
-            <div>No saved templates yet.<br>Generate a template and click <strong>Save</strong> to keep it here.</div>
+            <div class="saved-empty-icon">📭</div>
+            <div>No templates saved yet.<br>Generate a template and click <strong>💾 Save</strong> to add it to your MailForge library.</div>
           </div>
           <div class="saved-list" id="saved-list"></div>
         </div>
@@ -657,7 +657,7 @@
       <button class="toolbar-btn" onclick="copyHTML()" id="copy-btn" style="display:none">📋 Copy</button>
       <button class="toolbar-btn" onclick="openEmailDialog()" id="send-btn" style="display:none;border-color:#3b82f6;color:#2563eb;">✉️ Send</button>
       <button class="toolbar-btn primary" onclick="downloadHTML()" id="download-btn" style="display:none">⬇️ Download</button>
-      <button class="toolbar-btn" id="mailforge-save-btn" onclick="saveToMailForge()" style="display:none;background:#2563eb;color:#fff;border-color:#2563eb;font-weight:600;">📥 Save to MailForge</button>
+      <a class="toolbar-btn" id="mailforge-save-btn" href="/templates" target="_parent" style="display:none;background:#16a34a;color:#fff;border-color:#16a34a;font-weight:600;text-decoration:none;">📂 View All Templates</a>
     </div>
 
     <div class="preview-content">
@@ -704,12 +704,13 @@
 <!-- SAVE DIALOG -->
 <div class="dialog-overlay" id="save-dialog">
   <div class="dialog">
-    <h3>💾 Save Template</h3>
-    <p>Give this template a name so you can find it later.</p>
+    <h3>💾 Save to Templates</h3>
+    <p>Give this template a name. It will be saved to your <strong>MailForge Templates</strong> library and available for campaigns.</p>
     <input type="text" id="save-label-input" placeholder="e.g. Property Manager – 4th of July Email" maxlength="80">
+    <div id="save-dialog-status" style="display:none;margin-top:8px;padding:8px 10px;border-radius:6px;font-size:12px;"></div>
     <div class="dialog-actions">
-      <button class="dialog-btn" onclick="closeSaveDialog()">Cancel</button>
-      <button class="dialog-btn primary" onclick="confirmSave()">Save Template</button>
+      <button class="dialog-btn" id="save-cancel-btn" onclick="closeSaveDialog()">Cancel</button>
+      <button class="dialog-btn primary" id="save-confirm-btn" onclick="confirmSave()">Save to Templates</button>
     </div>
   </div>
 </div>
@@ -1094,50 +1095,22 @@
     return `Custom ${customFormat === 'flyer' ? 'Flyer' : 'Email'} – ${date}`;
   }
 
-  function confirmSave() {
+  async function confirmSave() {
     const label = document.getElementById('save-label-input').value.trim();
     if (!label) { document.getElementById('save-label-input').focus(); return; }
 
     const v = variations[activeVariation];
     if (!v) return;
-    v.label = label;
-    v.saved = true;
 
-    // Save to localStorage
-    const saves = getSaved();
-    const id = Date.now().toString();
-    // Determine folder: marketing mode uses audience, custom mode uses 'custom'
-    const folder = (currentMode === 'marketing' && selectedAudience) ? selectedAudience : 'custom';
-    saves.unshift({
-      id,
-      label,
-      html: v.html,
-      meta: v.meta,
-      folder,
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    });
-    localStorage.setItem('aptnetwork_templates', JSON.stringify(saves));
+    const statusEl = document.getElementById('save-dialog-status');
+    const confirmBtn = document.getElementById('save-confirm-btn');
+    const cancelBtn = document.getElementById('save-cancel-btn');
 
-    closeSaveDialog();
-    updateVariationTab(activeVariation, true);
-    updateSavedCount();
+    confirmBtn.disabled = true;
+    cancelBtn.disabled = true;
+    confirmBtn.textContent = 'Saving…';
+    statusEl.style.display = 'none';
 
-    const saveBtn = document.getElementById('save-btn');
-    saveBtn.classList.add('saved');
-    saveBtn.textContent = '✅ Saved';
-
-    setStatus('success', `Saved as "${label}"`);
-  }
-
-  // ── Save to MailForge Templates library ──
-  async function saveToMailForge() {
-    const v = variations[activeVariation];
-    if (!v) return;
-    const label = prompt('Template name for MailForge:', v.label || suggestLabel());
-    if (!label) return;
-    const btn = document.getElementById('mailforge-save-btn');
-    btn.textContent = '⏳ Saving…';
-    btn.disabled = true;
     try {
       const res = await fetch('/api/templates', {
         method: 'POST',
@@ -1150,149 +1123,152 @@
           blocks: '[]',
         })
       });
+
       if (res.ok) {
-        btn.textContent = '✅ Saved to MailForge!';
-        setStatus('success', `Saved "${label}" to MailForge Templates — find it under Templates in the sidebar.`);
-        setTimeout(() => { btn.textContent = '📥 Save to MailForge'; btn.disabled = false; }, 3000);
+        const data = await res.json();
+        v.label = label;
+        v.saved = true;
+
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#f0fdf4';
+        statusEl.style.border = '1px solid #bbf7d0';
+        statusEl.style.color = '#166534';
+        statusEl.innerHTML = `✅ Saved! <a href="/templates" style="color:#166534;font-weight:700;text-decoration:underline;" target="_parent">View in Templates →</a>`;
+
+        confirmBtn.textContent = '✅ Saved!';
+        updateVariationTab(activeVariation, true);
+        updateSavedCount();
+
+        const saveBtn = document.getElementById('save-btn');
+        saveBtn.classList.add('saved');
+        saveBtn.textContent = '✅ Saved';
+
+        setStatus('success', `"${label}" saved to Templates — <a href="/templates" target="_parent" style="color:#166534;text-decoration:underline;font-weight:600;">View in Templates →</a>`);
+
+        setTimeout(() => {
+          closeSaveDialog();
+          confirmBtn.disabled = false;
+          cancelBtn.disabled = false;
+          confirmBtn.textContent = 'Save to Templates';
+        }, 2500);
       } else {
         const d = await res.json();
-        setStatus('error', d.error || 'Failed to save to MailForge');
-        btn.textContent = '📥 Save to MailForge';
-        btn.disabled = false;
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#fef2f2';
+        statusEl.style.border = '1px solid #fecaca';
+        statusEl.style.color = '#dc2626';
+        statusEl.textContent = d.error || 'Failed to save. Make sure you are logged in to MailForge.';
+        confirmBtn.disabled = false;
+        cancelBtn.disabled = false;
+        confirmBtn.textContent = 'Save to Templates';
       }
     } catch (e) {
-      setStatus('error', 'Could not reach MailForge API');
-      btn.textContent = '📥 Save to MailForge';
-      btn.disabled = false;
+      statusEl.style.display = 'block';
+      statusEl.style.background = '#fef2f2';
+      statusEl.style.border = '1px solid #fecaca';
+      statusEl.style.color = '#dc2626';
+      statusEl.textContent = 'Could not reach MailForge — make sure the app is running.';
+      confirmBtn.disabled = false;
+      cancelBtn.disabled = false;
+      confirmBtn.textContent = 'Save to Templates';
     }
   }
 
-  // ── Saved Templates ──
-  function getSaved() {
-    try { return JSON.parse(localStorage.getItem('aptnetwork_templates') || '[]'); }
-    catch { return []; }
+  // ── Saved Templates (from MailForge API) ──
+  let savedTemplatesCache = [];
+
+  async function loadSavedTemplates() {
+    try {
+      const res = await fetch('/api/templates');
+      if (!res.ok) return [];
+      const all = await res.json();
+      return all.filter(t => !t.is_system);
+    } catch { return []; }
   }
 
-  function updateSavedCount() {
-    const saves = getSaved();
-    const badge = document.getElementById('saved-count');
-    if (saves.length > 0) {
-      badge.textContent = saves.length;
-      badge.style.display = 'inline';
-    } else {
-      badge.style.display = 'none';
-    }
+  async function updateSavedCount() {
+    try {
+      const res = await fetch('/api/templates');
+      if (!res.ok) return;
+      const all = await res.json();
+      const count = all.filter(t => !t.is_system).length;
+      const badge = document.getElementById('saved-count');
+      if (count > 0) { badge.textContent = count; badge.style.display = 'inline'; }
+      else badge.style.display = 'none';
+    } catch {}
   }
 
   let previewingSavedId = null;
 
-  const FOLDERS = [
-    { key: 'leasing_agent',    label: 'Leasing Agent / Team',  icon: '🏠' },
-    { key: 'property_manager', label: 'Property Manager',       icon: '👔' },
-    { key: 'regional_manager', label: 'Regional Manager',       icon: '📊' },
-    { key: 'realtor_locator',  label: 'Apartment Agent',        icon: '🔑' },
-    { key: 'custom',           label: 'Custom Content',         icon: '✏️' },
-  ];
-
-  // Track which folders are collapsed
-  const collapsedFolders = new Set();
-
-  function renderSavedList() {
-    const saves = getSaved();
+  async function renderSavedList() {
     const empty = document.getElementById('saved-empty');
     const list = document.getElementById('saved-list');
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:13px;">Loading…</div>';
+    empty.style.display = 'none';
+
+    const saves = await loadSavedTemplates();
+    savedTemplatesCache = saves;
     list.innerHTML = '';
-    empty.style.display = saves.length === 0 ? 'block' : 'none';
-    if (saves.length === 0) return;
 
-    FOLDERS.forEach(folder => {
-      // Support old saves without folder field — guess from meta/label
-      const folderSaves = saves.filter(s => {
-        if (s.folder) return s.folder === folder.key;
-        // legacy fallback
-        const combined = (s.label + ' ' + (s.meta || '')).toLowerCase();
-        if (folder.key === 'leasing_agent')    return combined.includes('leasing');
-        if (folder.key === 'property_manager') return combined.includes('property manager');
-        if (folder.key === 'regional_manager') return combined.includes('regional');
-        if (folder.key === 'realtor_locator')  return combined.includes('agent') || combined.includes('realtor');
-        if (folder.key === 'custom')           return combined.includes('custom');
-        return false;
-      });
-      if (folderSaves.length === 0) return;
+    if (saves.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
 
-      const isCollapsed = collapsedFolders.has(folder.key);
-
-      // Folder header
-      const header = document.createElement('div');
-      header.className = 'folder-header';
-      header.innerHTML = `
-        <span class="folder-icon">${folder.icon}</span>
-        <span class="folder-label">${folder.label}</span>
-        <span class="folder-count">${folderSaves.length}</span>
-        <span class="folder-chevron">${isCollapsed ? '▶' : '▼'}</span>`;
-      header.onclick = () => {
-        if (collapsedFolders.has(folder.key)) collapsedFolders.delete(folder.key);
-        else collapsedFolders.add(folder.key);
-        renderSavedList();
-      };
-      list.appendChild(header);
-
-      if (!isCollapsed) {
-        folderSaves.forEach(s => {
-          const item = document.createElement('div');
-          item.className = 'saved-item folder-item' + (previewingSavedId === s.id ? ' active-item' : '');
-          item.innerHTML = `
-            <div class="saved-item-info">
-              <div class="saved-item-label">${escHtml(s.label)}</div>
-              <div class="saved-item-meta">${escHtml(s.meta || '')} · ${s.date}</div>
-            </div>
-            <div class="saved-item-actions">
-              <button class="saved-action-btn" onclick="previewSaved('${s.id}',event)">👁 Preview</button>
-              <button class="saved-action-btn delete" onclick="deleteSaved('${s.id}',event)">🗑</button>
-            </div>`;
-          list.appendChild(item);
-        });
-      }
+    saves.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'saved-item' + (previewingSavedId === s.id ? ' active-item' : '');
+      item.style.padding = '10px 14px';
+      item.innerHTML = `
+        <div class="saved-item-info">
+          <div class="saved-item-label">${escHtml(s.name)}</div>
+          <div class="saved-item-meta">${escHtml(s.category || '')} · ${s.created_at ? new Date(s.created_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}) : ''}</div>
+        </div>
+        <div class="saved-item-actions">
+          <button class="saved-action-btn" onclick="previewSaved('${s.id}',event)">👁 Preview</button>
+          <a class="saved-action-btn" href="/templates/${s.id}/edit" target="_parent" style="text-decoration:none;display:inline-flex;align-items:center;">✏️ Edit</a>
+          <button class="saved-action-btn delete" onclick="deleteSaved('${s.id}',event)">🗑</button>
+        </div>`;
+      list.appendChild(item);
     });
   }
 
   function previewSaved(id, e) {
     e && e.stopPropagation();
-    const saves = getSaved();
-    const s = saves.find(x => x.id === id);
+    const s = savedTemplatesCache.find(x => x.id === id);
     if (!s) return;
 
     previewingSavedId = id;
     renderSavedList();
 
-    // Show in preview pane
     const frame = document.getElementById('preview-frame');
     const doc = frame.contentDocument || frame.contentWindow.document;
-    doc.open(); doc.write(s.html); doc.close();
-    frame.contentWindow.addEventListener('click', function(e) {
-      const a = e.target.closest('a');
-      if (a && a.href) { e.preventDefault(); window.open(a.href, '_blank'); }
+    doc.open(); doc.write(s.html_body || ''); doc.close();
+    frame.contentWindow.addEventListener('click', function(ev) {
+      const a = ev.target.closest('a');
+      if (a && a.href) { ev.preventDefault(); window.open(a.href, '_blank'); }
     });
-    document.getElementById('code-content').textContent = s.html;
+    document.getElementById('code-content').textContent = s.html_body || '';
     document.getElementById('empty-state').style.display = 'none';
 
-    // Show toolbar actions
-    variations = [{ html: s.html, label: s.label, saved: true, meta: s.meta }];
+    variations = [{ html: s.html_body || '', label: s.name, saved: true, meta: s.category }];
     activeVariation = 0;
     document.getElementById('variation-tabs').innerHTML = '';
-    document.getElementById('save-btn').style.display = 'none'; // already saved
+    document.getElementById('save-btn').style.display = 'none';
     document.getElementById('send-btn').style.display = 'flex';
     document.getElementById('copy-btn').style.display = 'flex';
     document.getElementById('download-btn').style.display = 'flex';
+    document.getElementById('mailforge-save-btn').style.display = 'none';
 
-    setStatus('success', `Previewing: ${s.label}`);
+    setStatus('success', `Previewing: ${s.name}`);
   }
 
-  function deleteSaved(id, e) {
+  async function deleteSaved(id, e) {
     e && e.stopPropagation();
-    if (!confirm('Delete this saved template?')) return;
-    const saves = getSaved().filter(s => s.id !== id);
-    localStorage.setItem('aptnetwork_templates', JSON.stringify(saves));
+    if (!confirm('Delete this template from MailForge?')) return;
+    try {
+      await fetch(`/api/templates/${id}`, { method: 'DELETE' });
+    } catch {}
     if (previewingSavedId === id) previewingSavedId = null;
     renderSavedList();
     updateSavedCount();

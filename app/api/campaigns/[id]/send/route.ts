@@ -16,7 +16,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (campaign.status === 'sent') return NextResponse.json({ error: 'Already sent' }, { status: 400 })
 
   const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(session.id) as Record<string, unknown> | undefined
-  if (!settings?.postmark_api_key) return NextResponse.json({ error: 'Postmark API key not configured in Settings' }, { status: 400 })
+  const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
+  if (!postmarkKey) return NextResponse.json({ error: 'Postmark API key not configured. Add it in Settings.' }, { status: 400 })
   if (!campaign.from_email) return NextResponse.json({ error: 'Sender email not set' }, { status: 400 })
 
   const listIds = parseJsonSafe<string[]>(campaign.list_ids as string, [])
@@ -49,14 +50,14 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       Subject: campaign.subject as string,
       HtmlBody: html,
       ReplyTo: campaign.reply_to as string | undefined,
-      MessageStream: (settings.postmark_message_stream as string) || 'broadcast',
+      MessageStream: (settings?.postmark_message_stream as string) || 'broadcast',
       TrackOpens: true,
       Metadata: { campaign_id: id, contact_id: contact.id },
     }
   })
 
   try {
-    const results = await sendBatch(settings.postmark_api_key as string, messages)
+    const results = await sendBatch(postmarkKey, messages)
 
     const insertRecipient = db.prepare('INSERT OR IGNORE INTO campaign_recipients (campaign_id, contact_id, contact_email, postmark_message_id) VALUES (?, ?, ?, ?)')
     const insertTx = db.transaction(() => {

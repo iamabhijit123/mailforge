@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status') || ''
   const db = getDb()
 
-  let query = 'SELECT c.*, cs.sent, cs.opens, cs.unique_opens, cs.clicks, cs.bounces, cs.unsubscribes FROM campaigns c LEFT JOIN campaign_stats cs ON cs.campaign_id = c.id WHERE c.user_id = ?'
+  let query = 'SELECT c.*, cs.sent, cs.opens, cs.unique_opens, cs.clicks, cs.unique_clicks, cs.bounces, cs.unsubscribes FROM campaigns c LEFT JOIN campaign_stats cs ON cs.campaign_id = c.id WHERE c.user_id = ?'
   const params: unknown[] = [session.id]
   if (status) { query += ' AND c.status = ?'; params.push(status) }
   query += ' ORDER BY c.created_at DESC'

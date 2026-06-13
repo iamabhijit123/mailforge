@@ -76,9 +76,10 @@ export async function POST() {
   for (const sc of dueCampaigns) {
     try {
       const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(sc.user_id) as Record<string, unknown> | null
-      if (!settings?.postmark_api_key) continue
-      const companyInfo = [settings.company_name, settings.company_address].filter(Boolean).join(' · ')
-      await executeCampaignSend(db, sc.campaign_id, sc.user_id, settings.postmark_api_key as string, settings.postmark_message_stream as string, companyInfo)
+      const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
+      if (!postmarkKey) continue
+      const companyInfo = [settings?.company_name, settings?.company_address].filter(Boolean).join(' · ')
+      await executeCampaignSend(db, sc.campaign_id, sc.user_id, postmarkKey, (settings?.postmark_message_stream as string) || 'broadcast', companyInfo)
       db.prepare("UPDATE scheduled_campaigns SET status = 'sent' WHERE id = ?").run(sc.id)
       results.scheduled_campaigns++
     } catch (e) {
@@ -100,7 +101,8 @@ export async function POST() {
       const template = db.prepare('SELECT * FROM templates WHERE id = ?').get(item.template_id) as Record<string, unknown> | null
       if (!template) continue
       const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(item.user_id) as Record<string, unknown> | null
-      if (!settings?.postmark_api_key) continue
+      const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
+      if (!postmarkKey) continue
 
       const blocks = parseJsonSafe<Parameters<typeof generateEmailHtml>[0]>(template.blocks as string, [])
       const companyInfo = [settings.company_name, settings.company_address].filter(Boolean).join(' · ')
@@ -117,9 +119,8 @@ export async function POST() {
       `).run(campaignId, item.user_id, `[Auto] ${template.name as string}`, subject, fromName, fromEmail, listIds, template.blocks as string, htmlBody, item.template_id)
       db.prepare('INSERT INTO campaign_stats (campaign_id) VALUES (?)').run(campaignId)
 
-      const apiKey = settings.postmark_api_key as string
-      const messageStream = (settings.postmark_message_stream as string) || 'broadcast'
-      await executeCampaignSend(db, campaignId, item.user_id, apiKey, messageStream, companyInfo)
+      const messageStream = (settings?.postmark_message_stream as string) || 'broadcast'
+      await executeCampaignSend(db, campaignId, item.user_id, postmarkKey, messageStream, companyInfo)
 
       db.prepare("UPDATE template_group_items SET status = 'sent', sent_at = datetime('now'), campaign_id = ? WHERE id = ?").run(campaignId, item.id)
       results.group_items++
