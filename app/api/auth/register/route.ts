@@ -21,7 +21,14 @@ export async function POST(req: NextRequest) {
   )
   db.prepare('INSERT INTO settings (user_id) VALUES (?)').run(id)
 
-  const token = await signToken({ id, email: email.toLowerCase().trim(), name: name.trim(), role: isFirst ? 'admin' : 'member' })
+  const token = await signToken({
+    id,
+    memberId: id,
+    email: email.toLowerCase().trim(),
+    name: name.trim(),
+    role: isFirst ? 'admin' : 'member',
+    isOwner: true,
+  })
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set(COOKIE_NAME, token, {

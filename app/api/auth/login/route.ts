@@ -8,13 +8,26 @@ export async function POST(req: NextRequest) {
   if (!email || !password) return NextResponse.json({ error: 'Email and password required' }, { status: 400 })
 
   const db = getDb()
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as { id: string; email: string; name: string; password_hash: string; role: string } | undefined
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim()) as {
+    id: string; email: string; name: string; password_hash: string; role: string; workspace_id: string | null
+  } | undefined
   if (!user) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
 
   const valid = await bcrypt.compare(password, user.password_hash)
   if (!valid) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
 
-  const token = await signToken({ id: user.id, email: user.email, name: user.name, role: user.role })
+  // workspace_id: use owner's id so all queries hit the same data
+  const workspaceId = user.workspace_id || user.id
+  const isOwner = !user.workspace_id
+
+  const token = await signToken({
+    id: workspaceId,
+    memberId: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    isOwner,
+  })
 
   const res = NextResponse.json({ ok: true })
   res.cookies.set(COOKIE_NAME, token, {

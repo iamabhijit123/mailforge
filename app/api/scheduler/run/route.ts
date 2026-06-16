@@ -94,7 +94,7 @@ export async function POST() {
     FROM template_group_items tgi
     JOIN template_groups tg ON tg.id = tgi.group_id
     WHERE tgi.status = 'pending' AND tgi.scheduled_at <= ? AND tg.status = 'active'
-  `).all(now) as Array<{ id: string; group_id: string; template_id: string; subject: string | null; user_id: string; list_id: string | null; group_from_name: string | null; group_from_email: string | null }>
+  `).all(now) as Array<{ id: string; group_id: string; template_id: string; subject: string | null; user_id: string; list_id: string | null; item_list_id: string | null; recipient_email: string | null; campaign_id: string | null; group_from_name: string | null; group_from_email: string | null }>
 
   for (const item of dueItems) {
     try {
@@ -105,22 +105,57 @@ export async function POST() {
       if (!postmarkKey) continue
 
       const blocks = parseJsonSafe<Parameters<typeof generateEmailHtml>[0]>(template.blocks as string, [])
-      const companyInfo = [settings.company_name, settings.company_address].filter(Boolean).join(' · ')
+      const companyInfo = settings ? [settings.company_name, settings.company_address].filter(Boolean).join(' · ') : ''
       const htmlBody = (template.html_body as string) || generateEmailHtml(blocks, {}, '{{unsubscribe_url}}', companyInfo)
       const subject = item.subject || (template.subject as string) || 'No Subject'
       const fromName = item.group_from_name || (settings.sender_name as string) || ''
       const fromEmail = item.group_from_email || (settings.sender_email as string) || ''
-      const listIds = item.list_id ? JSON.stringify([item.list_id]) : '[]'
+      // item_list_id takes precedence over group's list_id; recipient_email overrides both for single-email sends
+      const effectiveListId = item.item_list_id || item.list_id
+      const listIds = effectiveListId ? JSON.stringify([effectiveListId]) : '[]'
 
-      const campaignId = crypto.randomUUID()
-      db.prepare(`
-        INSERT INTO campaigns (id, user_id, name, subject, from_name, from_email, list_ids, blocks, html_body, status, template_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
-      `).run(campaignId, item.user_id, `[Auto] ${template.name as string}`, subject, fromName, fromEmail, listIds, template.blocks as string, htmlBody, item.template_id)
-      db.prepare('INSERT INTO campaign_stats (campaign_id) VALUES (?)').run(campaignId)
+      // Reuse pre-created campaign if available, otherwise create new one
+      let campaignId: string
+      const preCampaign = item.campaign_id
+        ? db.prepare("SELECT id FROM campaigns WHERE id = ? AND status IN ('scheduled', 'draft')").get(item.campaign_id) as { id: string } | null
+        : null
+
+      if (preCampaign) {
+        campaignId = preCampaign.id
+        // Apply any item-level list override and reset to draft for executeCampaignSend
+        db.prepare('UPDATE campaigns SET list_ids = ?, status = \'draft\', subject = ?, from_name = ?, from_email = ? WHERE id = ?').run(
+          listIds, subject, fromName, fromEmail, campaignId
+        )
+      } else {
+        campaignId = crypto.randomUUID()
+        db.prepare(`
+          INSERT INTO campaigns (id, user_id, name, subject, from_name, from_email, list_ids, blocks, html_body, status, template_id)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)
+        `).run(campaignId, item.user_id, `[Auto] ${template.name as string}`, subject, fromName, fromEmail, listIds, template.blocks as string, htmlBody, item.template_id)
+        db.prepare('INSERT INTO campaign_stats (campaign_id) VALUES (?)').run(campaignId)
+      }
 
       const messageStream = (settings?.postmark_message_stream as string) || 'broadcast'
-      await executeCampaignSend(db, campaignId, item.user_id, postmarkKey, messageStream, companyInfo)
+
+      if (item.recipient_email) {
+        // Single-email send — bypass list lookup, send directly to the specified address
+        const unsubUrl = `${APP_URL}/api/unsubscribe?email=${encodeURIComponent(item.recipient_email)}&uid=${item.user_id}`
+        const html = personalizeHtml(htmlBody, { first_name: null, last_name: null, email: item.recipient_email, id: '' }, unsubUrl)
+        const results = await sendBatch(postmarkKey, [{
+          From: `${fromName} <${fromEmail}>`,
+          To: item.recipient_email,
+          Subject: subject,
+          HtmlBody: html,
+          MessageStream: messageStream,
+          TrackOpens: true,
+          Metadata: { campaign_id: campaignId },
+        }])
+        const sent = results.filter(r => r?.ErrorCode === 0).length
+        db.prepare("UPDATE campaigns SET status = 'sent', sent_at = datetime('now'), total_recipients = ? WHERE id = ?").run(sent, campaignId)
+        db.prepare('UPDATE campaign_stats SET sent = ? WHERE campaign_id = ?').run(sent, campaignId)
+      } else {
+        await executeCampaignSend(db, campaignId, item.user_id, postmarkKey, messageStream, companyInfo)
+      }
 
       db.prepare("UPDATE template_group_items SET status = 'sent', sent_at = datetime('now'), campaign_id = ? WHERE id = ?").run(campaignId, item.id)
       results.group_items++

@@ -20,11 +20,16 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { campaign_id, scheduled_at } = body
+  const { campaign_id, scheduled_at, list_ids } = body
   if (!campaign_id || !scheduled_at) return NextResponse.json({ error: 'campaign_id and scheduled_at required' }, { status: 400 })
   const db = getDb()
   const campaign = db.prepare('SELECT id FROM campaigns WHERE id = ? AND user_id = ?').get(campaign_id, session.id)
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+
+  if (list_ids && Array.isArray(list_ids) && list_ids.length > 0) {
+    db.prepare('UPDATE campaigns SET list_ids = ? WHERE id = ? AND user_id = ?').run(JSON.stringify(list_ids), campaign_id, session.id)
+  }
+
   const existing = db.prepare("SELECT id FROM scheduled_campaigns WHERE campaign_id = ? AND status = 'pending'").get(campaign_id)
   if (existing) {
     db.prepare("UPDATE scheduled_campaigns SET scheduled_at = ? WHERE campaign_id = ? AND status = 'pending'").run(scheduled_at, campaign_id)

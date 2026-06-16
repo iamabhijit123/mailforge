@@ -26,8 +26,9 @@ export async function GET() {
     `).get(session.id) as Record<string, number> | null
 
     const recentCampaigns = db.prepare(`
-      SELECT c.id, c.name, c.subject, c.sent_at, c.status,
-        cs.sent, cs.unique_opens, cs.unique_clicks, cs.bounces
+      SELECT c.id, c.name, c.subject, c.sent_at, c.status, c.html_body,
+        COALESCE(cs.sent, 0) as sent, COALESCE(cs.unique_opens, 0) as unique_opens,
+        COALESCE(cs.unique_clicks, 0) as unique_clicks, COALESCE(cs.bounces, 0) as bounces
       FROM campaigns c
       LEFT JOIN campaign_stats cs ON cs.campaign_id = c.id
       WHERE c.user_id = ?
@@ -53,6 +54,8 @@ export async function GET() {
       ORDER BY date ASC
     `).all(session.id)
 
+    const userRow = db.prepare('SELECT name, email FROM users WHERE id = ?').get(session.id) as { name: string; email: string } | undefined
+
     return NextResponse.json({
       totalContacts,
       totalCampaigns,
@@ -61,6 +64,7 @@ export async function GET() {
       recentCampaigns,
       contactGrowth,
       opensByDay,
+      userName: userRow?.name || userRow?.email?.split('@')[0] || '',
     })
   } catch (err) {
     console.error('[analytics GET]', err)

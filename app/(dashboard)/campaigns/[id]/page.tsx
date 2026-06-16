@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Button, Input, Badge, Modal, Toast } from '@/components/ui'
+import { Button, Input, Badge, Modal, Toast, ScheduleDateTimePicker } from '@/components/ui'
 import { ArrowLeft, Send, FlaskConical, Save, ChevronDown, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { EmailBuilder } from '@/components/email-builder/EmailBuilder'
@@ -95,11 +95,12 @@ export default function CampaignEditorPage() {
     await save()
     const res = await fetch('/api/scheduled-campaigns', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id: id, scheduled_at: new Date(scheduleAt).toISOString() }),
+      body: JSON.stringify({ campaign_id: id, scheduled_at: scheduleAt }),
     })
     if (res.ok) {
       setShowSchedule(false)
       setToast({ msg: `Campaign scheduled for ${new Date(scheduleAt).toLocaleString()}`, type: 'success' })
+      setScheduleAt('')
     } else {
       const d = await res.json()
       setToast({ msg: d.error || 'Scheduling failed', type: 'error' })
@@ -195,17 +196,8 @@ export default function CampaignEditorPage() {
 
       <Modal open={showSchedule} onClose={() => setShowSchedule(false)} title="Schedule Campaign" size="sm">
         <div className="space-y-4">
-          <p className="text-sm text-gray-500">Choose a date and time to automatically send this campaign. The app must be running (browser open) at the scheduled time.</p>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Send Date & Time</label>
-            <input
-              type="datetime-local"
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-              value={scheduleAt}
-              min={new Date().toISOString().slice(0, 16)}
-              onChange={e => setScheduleAt(e.target.value)}
-            />
-          </div>
+          <p className="text-sm text-gray-500">Choose a date, time, and timezone to automatically send this campaign.</p>
+          <ScheduleDateTimePicker label="Send Date & Time" onChange={setScheduleAt} />
           <div className="text-sm text-gray-600 space-y-1">
             <p><strong>Lists:</strong> {form.list_ids.length === 0 ? 'None selected' : lists.filter(l => form.list_ids.includes(l.id)).map(l => l.name).join(', ')}</p>
           </div>

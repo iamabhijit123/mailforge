@@ -2,30 +2,173 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { Button, Badge, Modal, Input, Toast } from '@/components/ui'
-import { Plus, FileText, Edit2, Trash2, LayersIcon, Clock, Send, Sparkles, LayoutTemplate, FlaskConical, X } from 'lucide-react'
+import { Modal, Input, Toast } from '@/components/ui'
+import { Plus, FileText, Edit2, Trash2, LayersIcon, Clock, Send, Sparkles, LayoutTemplate, FlaskConical, X, Search, Code } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
 
 interface Template { id: string; name: string; category: string; subject: string | null; is_system: number; created_at: string; html_body: string | null }
 interface Group { id: string; name: string; description: string | null; list_name: string | null; item_count: number; sent_count: number; status: string; created_at: string }
 
+type Tab = 'library' | 'saved' | 'groups'
+
+function TemplateCard({
+  template,
+  onPreview,
+  onDelete,
+  onSelect,
+}: {
+  template: Template
+  onPreview: (t: Template) => void
+  onDelete: (id: string) => void
+  onSelect?: (t: Template) => void
+}) {
+  return (
+    <div className="group flex flex-col cursor-pointer">
+      {/* Thumbnail with hover overlay */}
+      <div className="relative h-[220px] rounded-xl overflow-hidden border-2 border-gray-200 group-hover:border-blue-400 transition-all shadow-sm">
+        <TemplatePreviewThumbnail html={template.html_body} height={220} />
+
+        {/* Hover overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex flex-col items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100">
+          {onSelect ? (
+            <button
+              onClick={() => onSelect(template)}
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-lg"
+            >
+              Select
+            </button>
+          ) : (
+            <Link href={`/templates/${template.id}/edit`} className="block">
+              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg transition-colors shadow-lg">
+                Edit
+              </button>
+            </Link>
+          )}
+          <button
+            onClick={() => onPreview(template)}
+            className="px-6 py-2 bg-white hover:bg-gray-100 text-gray-900 text-sm font-bold rounded-lg transition-colors shadow-lg"
+          >
+            Preview
+          </button>
+        </div>
+
+        {/* Delete button */}
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(template.id) }}
+          className="absolute top-2 right-2 w-7 h-7 bg-black/40 hover:bg-red-600 text-white rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+          title="Delete"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      {/* Name */}
+      <p className="mt-2 text-sm font-medium text-gray-800 text-center truncate px-1">{template.name}</p>
+    </div>
+  )
+}
+
+function PreviewModal({
+  template,
+  onClose,
+  onEdit,
+  onTest,
+}: {
+  template: Template
+  onClose: () => void
+  onEdit: () => void
+  onTest: (email: string) => Promise<void>
+}) {
+  const [testEmail, setTestEmail] = useState('')
+  const [sending, setSending] = useState(false)
+  const [showTest, setShowTest] = useState(false)
+
+  async function handleTest() {
+    setSending(true)
+    await onTest(testEmail)
+    setSending(false)
+    setShowTest(false)
+    setTestEmail('')
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '90vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div>
+            <h2 className="font-bold text-gray-900">{template.name}</h2>
+            {template.subject && <p className="text-sm text-gray-500 mt-0.5">{template.subject}</p>}
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="flex flex-1 overflow-hidden">
+          <div className="flex-1 overflow-auto bg-[#F0F2F5] p-6">
+            <iframe
+              srcDoc={template.html_body || '<div style="font-family:sans-serif;color:#999;padding:60px;text-align:center">No preview available</div>'}
+              title="Template Preview"
+              className="w-full max-w-[640px] mx-auto block border-0 bg-white shadow-lg rounded-xl"
+              style={{ minHeight: 500 }}
+              sandbox="allow-same-origin"
+            />
+          </div>
+          <div className="w-60 flex-shrink-0 border-l border-gray-100 bg-gray-50 flex flex-col">
+            <div className="p-4 border-b border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</p>
+            </div>
+            <div className="p-4 flex flex-col gap-2.5 flex-1">
+              <button onClick={onEdit} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+                <Edit2 className="w-3.5 h-3.5" /> Edit Template
+              </button>
+              <Link href={`/campaigns/new?template_id=${template.id}`} className="block">
+                <button className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                  <Send className="w-3.5 h-3.5 text-gray-400" /> Use in Campaign
+                </button>
+              </Link>
+              <div className="border-t border-gray-200 pt-2.5">
+                {!showTest ? (
+                  <button onClick={() => setShowTest(true)} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                    <FlaskConical className="w-3.5 h-3.5 text-gray-400" /> Send Test Email
+                  </button>
+                ) : (
+                  <div className="bg-white rounded-xl border border-gray-200 p-3 space-y-2.5">
+                    <p className="text-xs font-semibold text-gray-700">Send test to:</p>
+                    <input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="your@email.com" autoFocus
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400" />
+                    <button onClick={handleTest} disabled={sending || !testEmail}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
+                      {sending ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <FlaskConical className="w-3.5 h-3.5" />}
+                      {sending ? 'Sending…' : 'Send Test'}
+                    </button>
+                    <button onClick={() => setShowTest(false)} className="w-full py-1.5 text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-auto">{formatDate(template.created_at)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
+  const [tab, setTab] = useState<Tab>('library')
+  const [q, setQ] = useState('')
 
-  // Create modal state
   const [showCreateType, setShowCreateType] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
+  const [showPasteHtml, setShowPasteHtml] = useState(false)
   const [form, setForm] = useState({ name: '', category: 'custom', subject: '' })
+  const [pasteHtml, setPasteHtml] = useState('')
+  const [pasteName, setPasteName] = useState('')
 
-  // Preview modal state
   const [previewTpl, setPreviewTpl] = useState<Template | null>(null)
-  const [testEmail, setTestEmail] = useState('')
-  const [testSending, setTestSending] = useState(false)
-  const [showTestForm, setShowTestForm] = useState(false)
-
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   async function load() {
@@ -47,267 +190,380 @@ export default function TemplatesPage() {
     }
   }
 
+  async function createFromHtml() {
+    if (!pasteName.trim() || !pasteHtml.trim()) return
+    const res = await fetch('/api/templates', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: pasteName, category: 'custom', subject: '', html_body: pasteHtml }),
+    })
+    if (res.ok) {
+      const data = await res.json()
+      setShowPasteHtml(false)
+      setPasteHtml(''); setPasteName('')
+      setToast({ msg: 'Template created from HTML', type: 'success' })
+      load()
+      window.location.href = `/templates/${data.id}/edit`
+    }
+  }
+
   async function deleteTemplate(id: string) {
     if (!confirm('Delete this template?')) return
     await fetch(`/api/templates/${id}`, { method: 'DELETE' })
-    load()
-    setToast({ msg: 'Template deleted', type: 'success' })
+    load(); setToast({ msg: 'Template deleted', type: 'success' })
   }
 
   async function deleteGroup(id: string) {
     if (!confirm('Delete this group and all its scheduled items?')) return
     await fetch(`/api/template-groups/${id}`, { method: 'DELETE' })
-    load()
-    setToast({ msg: 'Group deleted', type: 'success' })
+    load(); setToast({ msg: 'Group deleted', type: 'success' })
   }
 
-  async function sendTest() {
-    if (!testEmail || !previewTpl) return
-    setTestSending(true)
+  async function sendTest(email: string) {
+    if (!previewTpl) return
     const res = await fetch(`/api/templates/${previewTpl.id}/test`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to_email: testEmail }),
+      body: JSON.stringify({ to_email: email }),
     })
-    setTestSending(false)
     const data = await res.json()
-    if (res.ok) {
-      setShowTestForm(false)
-      setToast({ msg: `Test sent to ${testEmail}`, type: 'success' })
-    } else {
-      setToast({ msg: data.error || 'Failed to send test', type: 'error' })
-    }
-  }
-
-  function openPreview(t: Template) {
-    setPreviewTpl(t)
-    setShowTestForm(false)
-    setTestEmail('')
+    if (res.ok) setToast({ msg: `Test sent to ${email}`, type: 'success' })
+    else setToast({ msg: data.error || 'Failed to send test', type: 'error' })
   }
 
   const userTemplates = templates.filter(t => !t.is_system)
+  const filteredTemplates = q ? userTemplates.filter(t => t.name.toLowerCase().includes(q.toLowerCase())) : userTemplates
+  const filteredGroups = q ? groups.filter(g => g.name.toLowerCase().includes(q.toLowerCase())) : groups
+
+  const TABS = [
+    { key: 'library' as Tab, label: 'Library' },
+    { key: 'saved' as Tab, label: `My Templates${userTemplates.length > 0 ? ` (${userTemplates.length})` : ''}` },
+    { key: 'groups' as Tab, label: `Groups${groups.length > 0 ? ` (${groups.length})` : ''}` },
+  ]
+
+  const CREATE_OPTIONS = [
+    {
+      icon: LayoutTemplate,
+      title: 'Start from blank',
+      desc: 'Design your email from scratch using our drag-and-drop visual editor.',
+      action: 'Build from scratch',
+      color: 'text-blue-600',
+      bg: 'bg-blue-50',
+      onClick: () => { setShowCreateType(false); setShowCreate(true) },
+    },
+    {
+      icon: Sparkles,
+      title: 'Generate with AI',
+      desc: 'Describe your email and let Claude AI generate a beautiful design instantly.',
+      action: 'Open AI Maker',
+      color: 'text-purple-600',
+      bg: 'bg-purple-50',
+      href: '/templates/ai-maker',
+    },
+    {
+      icon: Code,
+      title: 'Paste your own code',
+      desc: 'Bring in a fully developed HTML email design and edit it directly.',
+      action: 'Paste HTML',
+      color: 'text-green-600',
+      bg: 'bg-green-50',
+      onClick: () => { setShowCreateType(false); setShowPasteHtml(true) },
+    },
+  ]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-0">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {previewTpl && (
+        <PreviewModal
+          template={previewTpl}
+          onClose={() => setPreviewTpl(null)}
+          onEdit={() => { window.location.href = `/templates/${previewTpl.id}/edit` }}
+          onTest={sendTest}
+        />
+      )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Templates</h1>
-          <p className="text-sm text-gray-500 mt-1">Save reusable email designs and create scheduled groups</p>
-        </div>
-        <div className="flex gap-2">
+      {/* Page header */}
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-[22px] font-bold text-gray-900 tracking-tight">Choose a template</h1>
+        <div className="flex items-center gap-2">
           <Link href="/templates/groups/new">
-            <Button variant="outline" size="sm"><LayersIcon className="w-3.5 h-3.5" /> New Group</Button>
+            <button className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-card">
+              <LayersIcon className="w-4 h-4 text-gray-400" /> New Group
+            </button>
           </Link>
-          <Button size="sm" onClick={() => setShowCreateType(true)}><Plus className="w-3.5 h-3.5" /> New Template</Button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> New Template
+          </button>
         </div>
       </div>
 
-      {loading ? <div className="text-center py-12 text-gray-400">Loading…</div> : (
-        <div className="space-y-10">
-
-          {/* Template Groups */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <LayersIcon className="w-4 h-4 text-brand-600" />
-                Template Groups ({groups.length})
-              </h2>
-              <Link href="/templates/groups/new" className="text-xs text-brand-600 hover:underline">+ New Group</Link>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-700 mb-3">
-              Groups let you add multiple templates and schedule each one to send on a different date — perfect for drip campaigns that look fresh.
-            </div>
-            {groups.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <LayersIcon className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">No template groups yet.</p>
-                <Link href="/templates/groups/new">
-                  <Button size="sm" className="mt-3"><Plus className="w-3.5 h-3.5" /> Create first group</Button>
-                </Link>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {groups.map(g => (
-                  <div key={g.id} className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 flex flex-col gap-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{g.name}</h3>
-                        {g.description && <p className="text-xs text-gray-500 mt-0.5">{g.description}</p>}
-                      </div>
-                      <div className="flex gap-1">
-                        <Link href={`/templates/groups/${g.id}`} className="p-1 text-gray-400 hover:text-brand-600"><Edit2 className="w-4 h-4" /></Link>
-                        <button onClick={() => deleteGroup(g.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{g.item_count} scheduled</span>
-                      <span className="flex items-center gap-1"><Send className="w-3 h-3" />{g.sent_count} sent</span>
-                    </div>
-                    {g.list_name && <p className="text-xs text-gray-500">List: <span className="font-medium">{g.list_name}</span></p>}
-                    <div className="flex items-center justify-between">
-                      <Badge variant={g.status === 'active' ? 'success' : 'default'}>{g.status}</Badge>
-                      <Link href={`/templates/groups/${g.id}`} className="text-xs text-brand-600 hover:underline">Manage →</Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* My Templates */}
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-gray-400" />
-              My Templates ({userTemplates.length})
-            </h2>
-            {userTemplates.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-                <FileText className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">No templates yet.</p>
-                <Button size="sm" className="mt-3" onClick={() => setShowCreateType(true)}><Plus className="w-3.5 h-3.5" /> Create template</Button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {userTemplates.map(t => (
-                  <div key={t.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden flex flex-col group">
-                    {/* Clickable preview */}
-                    <div className="cursor-pointer" onClick={() => openPreview(t)}>
-                      <TemplatePreviewThumbnail html={t.html_body} height={140} />
-                    </div>
-                    <div className="p-4 flex flex-col gap-2 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 cursor-pointer" onClick={() => openPreview(t)}>
-                          <h3 className="font-semibold text-gray-900 truncate hover:text-brand-600">{t.name}</h3>
-                          <Badge variant="default" className="mt-1">{t.category}</Badge>
-                        </div>
-                        <div className="flex gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
-                          <Link href={`/templates/${t.id}/edit`} className="p-1 text-gray-400 hover:text-brand-600"><Edit2 className="w-4 h-4" /></Link>
-                          <button onClick={() => deleteTemplate(t.id)} className="p-1 text-gray-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                      {t.subject && <p className="text-xs text-gray-500 truncate">{t.subject}</p>}
-                      <p className="text-xs text-gray-400">Updated {formatDate(t.created_at)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Template Preview Modal ── */}
-      {previewTpl && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '90vh' }}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{previewTpl.name}</h2>
-                {previewTpl.subject && <p className="text-sm text-gray-500 mt-0.5">{previewTpl.subject}</p>}
-              </div>
-              <button onClick={() => setPreviewTpl(null)} className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100">
-                <X className="w-5 h-5" />
+      {/* Main card */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-card">
+        {/* Tabs + Search row */}
+        <div className="flex items-center border-b border-gray-100 px-6">
+          <div className="flex gap-0">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-5 py-4 text-sm font-semibold border-b-2 -mb-px transition-all whitespace-nowrap ${
+                  tab === t.key
+                    ? 'border-blue-600 text-blue-700'
+                    : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'
+                }`}
+              >
+                {t.label}
               </button>
-            </div>
-
-            {/* Body */}
-            <div className="flex flex-1 overflow-hidden">
-              {/* Email preview */}
-              <div className="flex-1 overflow-auto bg-gray-100 p-4">
-                <iframe
-                  srcDoc={previewTpl.html_body || '<p style="font-family:sans-serif;color:#999;padding:40px;text-align:center">No preview available</p>'}
-                  title="Template Preview"
-                  className="w-full max-w-2xl mx-auto block border-0 bg-white shadow rounded"
-                  style={{ minHeight: 500 }}
-                  sandbox="allow-same-origin"
-                />
-              </div>
-
-              {/* Action panel */}
-              <div className="w-56 flex-shrink-0 border-l bg-gray-50 p-4 flex flex-col gap-3">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</p>
-
-                <Link href={`/templates/${previewTpl.id}/edit`}>
-                  <Button variant="outline" size="sm" className="w-full"><Edit2 className="w-3.5 h-3.5" /> Edit Template</Button>
-                </Link>
-
-                <Link href={`/campaigns/new?template_id=${previewTpl.id}`}>
-                  <Button variant="secondary" size="sm" className="w-full"><Send className="w-3.5 h-3.5" /> Create Campaign</Button>
-                </Link>
-
-                <hr className="border-gray-200" />
-
-                {!showTestForm ? (
-                  <Button size="sm" className="w-full" onClick={() => setShowTestForm(true)}>
-                    <FlaskConical className="w-3.5 h-3.5" /> Send Test Email
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <Input
-                      label="Send test to"
-                      type="email"
-                      value={testEmail}
-                      onChange={e => setTestEmail(e.target.value)}
-                      placeholder="your@email.com"
-                      autoFocus
-                    />
-                    <Button size="sm" className="w-full" onClick={sendTest} loading={testSending}>
-                      <FlaskConical className="w-3.5 h-3.5" /> Send
-                    </Button>
-                    <Button variant="ghost" size="sm" className="w-full" onClick={() => setShowTestForm(false)}>Cancel</Button>
-                  </div>
-                )}
-
-                <hr className="border-gray-200 mt-auto" />
-                <p className="text-xs text-gray-400">{formatDate(previewTpl.created_at)}</p>
-              </div>
+            ))}
+          </div>
+          <div className="ml-auto py-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                className="pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-gray-50 w-56"
+                placeholder="Search templates…"
+                value={q}
+                onChange={e => setQ(e.target.value)}
+              />
             </div>
           </div>
         </div>
-      )}
 
-      {/* Step 1: Choose template type */}
-      <Modal open={showCreateType} onClose={() => setShowCreateType(false)} title="Create New Template" size="sm">
-        <div className="grid grid-cols-2 gap-4 py-2">
-          <button
-            onClick={() => { setShowCreateType(false); setShowCreate(true) }}
-            className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-xl hover:border-brand-500 hover:bg-brand-50 transition-all group text-left"
-          >
-            <div className="w-12 h-12 rounded-full bg-brand-50 group-hover:bg-brand-100 flex items-center justify-center">
-              <LayoutTemplate className="w-6 h-6 text-brand-600" />
-            </div>
-            <div className="text-center">
-              <p className="font-semibold text-gray-900">Visual Builder</p>
-              <p className="text-xs text-gray-500 mt-1">Drag & drop blocks to design your email</p>
-            </div>
-          </button>
+        <div className="p-6">
+          {/* ── LIBRARY TAB ── */}
+          {tab === 'library' && (
+            <div className="space-y-8">
+              {/* Create your own email */}
+              <section>
+                <h2 className="text-base font-bold text-gray-900 mb-4">Create your own email</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {CREATE_OPTIONS.map(opt => (
+                    <div key={opt.title} className="border border-gray-200 rounded-xl p-5 hover:border-gray-300 hover:shadow-card-hover transition-all group">
+                      <div className={`w-11 h-11 rounded-xl ${opt.bg} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                        <opt.icon className={`w-5.5 h-5.5 ${opt.color}`} />
+                      </div>
+                      <h3 className="font-bold text-gray-900 text-sm mb-1">{opt.title}</h3>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-4">{opt.desc}</p>
+                      {opt.href ? (
+                        <Link href={opt.href} className={`text-sm font-semibold ${opt.color} hover:underline`}>
+                          {opt.action} →
+                        </Link>
+                      ) : (
+                        <button onClick={opt.onClick} className={`text-sm font-semibold ${opt.color} hover:underline`}>
+                          {opt.action} →
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
 
-          <Link
-            href="/templates/ai-maker"
-            onClick={() => setShowCreateType(false)}
-            className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
-          >
-            <div className="w-12 h-12 rounded-full bg-purple-50 group-hover:bg-purple-100 flex items-center justify-center">
-              <Sparkles className="w-6 h-6 text-purple-600" />
+              {/* My templates inline preview in Library */}
+              {userTemplates.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-base font-bold text-gray-900">My saved templates</h2>
+                    <button onClick={() => setTab('saved')} className="text-sm text-blue-600 hover:text-blue-700 font-semibold">
+                      View all ({userTemplates.length}) →
+                    </button>
+                  </div>
+                  {loading ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="animate-pulse">
+                          <div className="rounded-xl bg-gray-200" style={{ aspectRatio: '3/4' }} />
+                          <div className="h-3 bg-gray-200 rounded mt-2 mx-4" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                      {userTemplates.slice(0, 5).map(t => (
+                        <TemplateCard key={t.id} template={t} onPreview={setPreviewTpl} onDelete={deleteTemplate} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {userTemplates.length === 0 && !loading && (
+                <section>
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl py-14 text-center">
+                    <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <FileText className="w-7 h-7 text-gray-400" />
+                    </div>
+                    <p className="text-sm font-semibold text-gray-700 mb-1">No templates saved yet</p>
+                    <p className="text-xs text-gray-400 mb-4">Create one using the options above</p>
+                  </div>
+                </section>
+              )}
             </div>
-            <div className="text-center">
-              <p className="font-semibold text-gray-900">AI Maker</p>
-              <p className="text-xs text-gray-500 mt-1">Generate stunning emails with Claude AI</p>
+          )}
+
+          {/* ── MY TEMPLATES TAB ── */}
+          {tab === 'saved' && (
+            <div className="space-y-4">
+              {loading ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} className="animate-pulse">
+                      <div className="rounded-xl bg-gray-200" style={{ aspectRatio: '3/4' }} />
+                      <div className="h-3 bg-gray-200 rounded mt-2 mx-4" />
+                    </div>
+                  ))}
+                </div>
+              ) : filteredTemplates.length === 0 ? (
+                <div className="py-20 text-center">
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <p className="text-gray-900 font-semibold mb-1">
+                    {userTemplates.length === 0 ? 'No templates yet' : 'No results for your search'}
+                  </p>
+                  <p className="text-sm text-gray-500 mb-5">
+                    {userTemplates.length === 0 ? 'Start by creating a template in the Library tab.' : 'Try a different search term.'}
+                  </p>
+                  {userTemplates.length === 0 && (
+                    <button onClick={() => setTab('library')} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto">
+                      <Plus className="w-4 h-4" /> Go to Library
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+                  {filteredTemplates.map(t => (
+                    <TemplateCard key={t.id} template={t} onPreview={setPreviewTpl} onDelete={deleteTemplate} />
+                  ))}
+                  {/* Add new card */}
+                  <button
+                    onClick={() => setShowCreate(true)}
+                    className="flex flex-col items-center justify-center h-[220px] border-2 border-dashed border-gray-300 hover:border-blue-400 rounded-xl transition-colors group"
+                  >
+                    <div className="w-12 h-12 bg-gray-100 group-hover:bg-blue-50 rounded-xl flex items-center justify-center mb-2 transition-colors">
+                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-400 group-hover:text-blue-600 transition-colors">New Template</span>
+                  </button>
+                </div>
+              )}
             </div>
-          </Link>
+          )}
+
+          {/* ── GROUPS TAB ── */}
+          {tab === 'groups' && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-start gap-3 text-sm text-blue-700">
+                <Clock className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-500" />
+                <span>Groups let you schedule multiple templates to send on different dates — perfect for drip campaigns that look fresh each time.</span>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-gray-50 rounded-xl p-5 animate-pulse h-36" />
+                  ))}
+                </div>
+              ) : filteredGroups.length === 0 ? (
+                <div className="py-20 text-center">
+                  <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <LayersIcon className="w-7 h-7 text-gray-400" />
+                  </div>
+                  <p className="text-gray-900 font-semibold mb-1">No groups yet</p>
+                  <p className="text-sm text-gray-500 mb-5">Create a group to organize templates into a drip schedule.</p>
+                  <Link href="/templates/groups/new">
+                    <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto">
+                      <Plus className="w-4 h-4" /> Create first group
+                    </button>
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-end">
+                    <Link href="/templates/groups/new">
+                      <button className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors">
+                        <Plus className="w-4 h-4" /> New Group
+                      </button>
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredGroups.map(g => (
+                      <div key={g.id} className="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-card-hover hover:border-gray-300 transition-all group flex flex-col gap-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-bold text-gray-900 text-sm">{g.name}</h3>
+                            {g.description && <p className="text-xs text-gray-500 mt-0.5">{g.description}</p>}
+                          </div>
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link href={`/templates/groups/${g.id}`} className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"><Edit2 className="w-3.5 h-3.5" /></Link>
+                            <button onClick={() => deleteGroup(g.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-gray-400" />{g.item_count} scheduled</span>
+                          <span className="flex items-center gap-1"><Send className="w-3.5 h-3.5 text-gray-400" />{g.sent_count} sent</span>
+                        </div>
+                        {g.list_name && <p className="text-xs text-gray-500">List: <span className="font-semibold text-gray-700">{g.list_name}</span></p>}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 mt-auto">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${g.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{g.status}</span>
+                          <Link href={`/templates/groups/${g.id}`} className="text-xs text-blue-600 hover:text-blue-700 font-semibold">Manage →</Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create from blank modal */}
+      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Template — Visual Builder" size="sm">
+        <div className="space-y-4">
+          <Input label="Template Name *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g., Monthly Newsletter" autoFocus />
+          <Input label="Default Subject (optional)" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} placeholder="Enter subject line" />
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={createTemplate}
+              disabled={!form.name.trim()}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+            >
+              Create & Edit
+            </button>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       </Modal>
 
-      {/* Step 2: Visual builder — name form */}
-      <Modal open={showCreate} onClose={() => setShowCreate(false)} title="New Template" size="sm">
+      {/* Paste HTML modal */}
+      <Modal open={showPasteHtml} onClose={() => setShowPasteHtml(false)} title="Paste HTML Code" size="lg">
         <div className="space-y-4">
-          <Input label="Template Name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus />
-          <Input label="Default Subject (optional)" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} />
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={createTemplate}>Create & Edit</Button>
-            <Button variant="secondary" onClick={() => setShowCreate(false)}>Cancel</Button>
+          <Input label="Template Name *" value={pasteName} onChange={e => setPasteName(e.target.value)} placeholder="e.g., Custom HTML Email" autoFocus />
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-gray-700">HTML Code *</label>
+            <textarea
+              value={pasteHtml}
+              onChange={e => setPasteHtml(e.target.value)}
+              placeholder="Paste your full HTML email code here (starting with <!DOCTYPE html>)…"
+              className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm font-mono text-gray-900 placeholder:text-gray-400 focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none"
+              rows={14}
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={createFromHtml}
+              disabled={!pasteName.trim() || !pasteHtml.trim()}
+              className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors"
+            >
+              Save Template
+            </button>
+            <button onClick={() => setShowPasteHtml(false)} className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+              Cancel
+            </button>
           </div>
         </div>
       </Modal>

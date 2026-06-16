@@ -2,15 +2,16 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
-import { Button, Input, Toast, Badge } from '@/components/ui'
-import { Plus, Trash2, ArrowLeft, Clock, CheckCircle, AlertCircle, Send } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { Button, Input, Toast, Badge, ScheduleDateTimePicker } from '@/components/ui'
+import { Plus, Trash2, ArrowLeft, Clock, CheckCircle, AlertCircle, Send, RefreshCw } from 'lucide-react'
+import { formatDateTime } from '@/lib/utils'
 
 interface Template { id: string; name: string; subject: string | null }
 interface List { id: string; name: string }
 interface GroupItem {
   id: string; template_id: string; template_name: string | null; template_subject: string | null
   subject: string | null; scheduled_at: string; sent_at: string | null; status: string; position: number
+  campaign_id: string | null; item_list_id: string | null; recipient_email: string | null
 }
 interface Group {
   id: string; name: string; description: string | null; list_id: string | null; list_name: string | null
@@ -31,8 +32,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showAdd, setShowAdd] = useState(false)
-  const [addForm, setAddForm] = useState({ template_id: '', subject: '', scheduled_at: '' })
+  const [addForm, setAddForm] = useState({ template_id: '', subject: '', scheduled_at: '', recipient_mode: 'list' as 'list' | 'email', item_list_id: '', recipient_email: '' })
   const [saving, setSaving] = useState(false)
+  const [running, setRunning] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({ name: '', description: '', list_id: '', from_name: '', from_email: '', status: 'active' })
 
@@ -58,13 +60,25 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
 
   async function addItem() {
     if (!addForm.template_id || !addForm.scheduled_at) { setToast({ msg: 'Template and date required', type: 'error' }); return }
+    if (addForm.recipient_mode === 'email' && !addForm.recipient_email) { setToast({ msg: 'Email address required', type: 'error' }); return }
     setSaving(true)
+    const payload: Record<string, unknown> = {
+      template_id: addForm.template_id,
+      subject: addForm.subject,
+      scheduled_at: addForm.scheduled_at,
+      position: (group?.items.length ?? 0) + 1,
+    }
+    if (addForm.recipient_mode === 'list') {
+      payload.item_list_id = addForm.item_list_id || group?.list_id || null
+    } else {
+      payload.recipient_email = addForm.recipient_email
+    }
     const res = await fetch(`/api/template-groups/${id}/items`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...addForm, position: (group?.items.length ?? 0) + 1 }),
+      body: JSON.stringify(payload),
     })
     if (res.ok) {
-      setAddForm({ template_id: '', subject: '', scheduled_at: '' })
+      setAddForm({ template_id: '', subject: '', scheduled_at: '', recipient_mode: 'list', item_list_id: '', recipient_email: '' })
       setShowAdd(false)
       setToast({ msg: 'Template scheduled', type: 'success' })
       load()
@@ -73,6 +87,18 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
       setToast({ msg: d.error || 'Failed', type: 'error' })
     }
     setSaving(false)
+  }
+
+  async function runScheduler() {
+    setRunning(true)
+    try {
+      const res = await fetch('/api/scheduler/run', { method: 'POST' })
+      const d = await res.json()
+      if (d.errors?.length) setToast({ msg: `Scheduler error: ${d.errors[0]}`, type: 'error' })
+      else setToast({ msg: `Scheduler ran — ${d.group_items} sent`, type: 'success' })
+      load()
+    } catch { setToast({ msg: 'Scheduler failed to run', type: 'error' }) }
+    setRunning(false)
   }
 
   async function saveGroup() {
@@ -84,16 +110,16 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     else setToast({ msg: 'Failed to save', type: 'error' })
   }
 
-  async function removeItem(itemId: string) {
-    if (!confirm('Remove this scheduled template?')) return
-    // Use the PUT endpoint to replace with filtered list
-    const remaining = (group?.items || []).filter(i => i.id !== itemId && i.status === 'pending')
-    await fetch(`/api/template-groups/${id}/items`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: remaining }),
-    })
-    load()
-    setToast({ msg: 'Removed', type: 'success' })
+  async function cancelItem(itemId: string) {
+    if (!confirm('Cancel this scheduled send? The item will be removed from the schedule.')) return
+    const res = await fetch(`/api/template-groups/${id}/items?item_id=${itemId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setToast({ msg: 'Schedule cancelled', type: 'success' })
+      load()
+    } else {
+      const d = await res.json()
+      setToast({ msg: d.error || 'Failed to cancel', type: 'error' })
+    }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
@@ -110,6 +136,9 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
           {group.description && <p className="text-sm text-gray-500 mt-0.5">{group.description}</p>}
         </div>
         <Badge variant={group.status === 'active' ? 'success' : 'default'}>{group.status}</Badge>
+        <Button variant="secondary" size="sm" onClick={runScheduler} disabled={running}>
+          <RefreshCw className={`w-3.5 h-3.5 ${running ? 'animate-spin' : ''}`} /> {running ? 'Running…' : 'Run Now'}
+        </Button>
         <Button variant="secondary" size="sm" onClick={() => setEditMode(!editMode)}>{editMode ? 'Cancel' : 'Edit Group'}</Button>
       </div>
 
@@ -174,10 +203,15 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
                     {STATUS_ICON[item.status] || <Clock className="w-4 h-4 text-gray-400" />}
                     <span className="capitalize">{item.status}</span>
                   </div>
-                  <div>{item.status === 'sent' && item.sent_at ? `Sent ${formatDate(item.sent_at)}` : `Scheduled ${formatDate(item.scheduled_at)}`}</div>
+                  <div>{item.status === 'sent' && item.sent_at ? `Sent ${formatDateTime(item.sent_at)}` : `Scheduled ${formatDateTime(item.scheduled_at)}`}</div>
                 </div>
                 {item.status === 'pending' && (
-                  <button onClick={() => removeItem(item.id)} className="p-1 text-gray-300 hover:text-red-500 flex-shrink-0"><Trash2 className="w-4 h-4" /></button>
+                  <button
+                    onClick={() => cancelItem(item.id)}
+                    className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors flex-shrink-0"
+                  >
+                    <Trash2 className="w-3 h-3" /> Cancel
+                  </button>
                 )}
               </div>
             ))}
@@ -205,17 +239,43 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
               placeholder="Leave blank to use template's subject"
             />
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Send Date & Time *</label>
-              <input
-                type="datetime-local"
-                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
-                value={addForm.scheduled_at}
-                onChange={e => setAddForm(f => ({ ...f, scheduled_at: e.target.value }))}
-              />
+              <label className="block text-xs font-medium text-gray-600 mb-1">Send To *</label>
+              <div className="flex gap-4 mb-2">
+                <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                  <input type="radio" name="recipient_mode" value="list" checked={addForm.recipient_mode === 'list'} onChange={() => setAddForm(f => ({ ...f, recipient_mode: 'list' }))} className="accent-blue-600" />
+                  Contact list
+                </label>
+                <label className="flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                  <input type="radio" name="recipient_mode" value="email" checked={addForm.recipient_mode === 'email'} onChange={() => setAddForm(f => ({ ...f, recipient_mode: 'email' }))} className="accent-blue-600" />
+                  Single email
+                </label>
+              </div>
+              {addForm.recipient_mode === 'list' ? (
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  value={addForm.item_list_id}
+                  onChange={e => setAddForm(f => ({ ...f, item_list_id: e.target.value }))}
+                >
+                  <option value="">{group?.list_name ? `Group default: ${group.list_name}` : '— No list (uses group default) —'}</option>
+                  {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="email"
+                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  placeholder="recipient@example.com"
+                  value={addForm.recipient_email}
+                  onChange={e => setAddForm(f => ({ ...f, recipient_email: e.target.value }))}
+                />
+              )}
             </div>
+            <ScheduleDateTimePicker
+              label="Send Date & Time *"
+              onChange={utcIso => setAddForm(f => ({ ...f, scheduled_at: utcIso }))}
+            />
             <div className="flex gap-2">
               <Button size="sm" onClick={addItem} disabled={saving}>{saving ? 'Scheduling…' : 'Schedule'}</Button>
-              <Button variant="secondary" size="sm" onClick={() => { setShowAdd(false); setAddForm({ template_id: '', subject: '', scheduled_at: '' }) }}>Cancel</Button>
+              <Button variant="secondary" size="sm" onClick={() => { setShowAdd(false); setAddForm({ template_id: '', subject: '', scheduled_at: '', recipient_mode: 'list', item_list_id: '', recipient_email: '' }) }}>Cancel</Button>
             </div>
           </div>
         )}

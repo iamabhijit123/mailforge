@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button, Input } from '@/components/ui'
-import { Mail } from 'lucide-react'
+import { Mail, Sparkles } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -35,27 +35,76 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-brand-600 rounded-xl mb-4">
-            <Mail className="w-6 h-6 text-white" />
+    <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #EFF6FF 0%, #F8FAFC 60%, #F0FDF4 100%)' }}>
+      {/* Left panel - branding */}
+      <div className="hidden lg:flex flex-col justify-between w-[420px] p-12 bg-gradient-to-br from-blue-600 to-blue-800 text-white">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
+            <Mail className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">MailForge</h1>
-          <p className="text-gray-500 mt-1">Sign in to your account</p>
+          <span className="font-bold text-xl tracking-tight">MailForge</span>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{error}</div>}
-            <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
-            <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
-            <Button type="submit" className="w-full" loading={loading}>Sign in</Button>
-          </form>
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-brand-600 font-medium hover:underline">Register</Link>
+        <div>
+          <h2 className="text-3xl font-bold leading-snug mb-4">
+            Email marketing that actually delivers.
+          </h2>
+          <p className="text-blue-200 text-base leading-relaxed">
+            Send beautiful campaigns, grow your contact list, and track every open and click — all from one place.
           </p>
+
+          <div className="mt-10 space-y-4">
+            {[
+              { icon: '✦', text: 'AI-powered email templates' },
+              { icon: '✦', text: 'Drag & drop visual builder' },
+              { icon: '✦', text: 'Real-time analytics & reports' },
+              { icon: '✦', text: 'Smart contact list management' },
+            ].map(f => (
+              <div key={f.text} className="flex items-center gap-3">
+                <span className="text-blue-300 text-lg">{f.icon}</span>
+                <span className="text-blue-100 text-sm">{f.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="text-blue-300 text-xs">© 2026 ApartmentNetwork.com · MailForge</p>
+      </div>
+
+      {/* Right panel - login form */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center justify-center gap-2 mb-8">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)' }}>
+              <Mail className="w-5 h-5 text-white" />
+            </div>
+            <span className="font-bold text-xl text-gray-900">MailForge</span>
+          </div>
+
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
+            <p className="text-gray-500 mt-1">Sign in to your MailForge account</p>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-card p-8">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-xl font-medium">
+                  {error}
+                </div>
+              )}
+              <Input label="Email address" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus placeholder="you@example.com" />
+              <Input label="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Enter your password" />
+              <Button type="submit" className="w-full py-3 text-base" loading={loading}>
+                Sign in to MailForge
+              </Button>
+            </form>
+            <p className="mt-5 text-center text-sm text-gray-500">
+              Don&apos;t have an account?{' '}
+              <Link href="/register" className="text-blue-600 font-semibold hover:underline">Register free</Link>
+            </p>
+          </div>
         </div>
       </div>
     </div>

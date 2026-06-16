@@ -5,7 +5,7 @@ import { sendBatch } from '@/lib/postmark'
 import { generateEmailHtml, personalizeHtml } from '@/lib/email-html'
 import { parseJsonSafe } from '@/lib/utils'
 
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
@@ -19,6 +19,13 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
   if (!postmarkKey) return NextResponse.json({ error: 'Postmark API key not configured. Add it in Settings.' }, { status: 400 })
   if (!campaign.from_email) return NextResponse.json({ error: 'Sender email not set' }, { status: 400 })
+
+  let body: { list_ids?: string[] } = {}
+  try { body = await req.json() } catch { /* no body */ }
+  if (body.list_ids && Array.isArray(body.list_ids) && body.list_ids.length > 0) {
+    db.prepare('UPDATE campaigns SET list_ids = ? WHERE id = ? AND user_id = ?').run(JSON.stringify(body.list_ids), id, session.id)
+    campaign.list_ids = JSON.stringify(body.list_ids)
+  }
 
   const listIds = parseJsonSafe<string[]>(campaign.list_ids as string, [])
   if (!listIds.length) return NextResponse.json({ error: 'No lists selected' }, { status: 400 })

@@ -7,9 +7,12 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
   const lists = db.prepare(`
-    SELECT l.*, COUNT(cl.contact_id) as contact_count
+    SELECT l.*,
+      COUNT(cl.contact_id) as contact_count,
+      COUNT(CASE WHEN c.status = 'subscribed' THEN 1 END) as subscribed_count
     FROM lists l
     LEFT JOIN contact_lists cl ON cl.list_id = l.id
+    LEFT JOIN contacts c ON c.id = cl.contact_id
     WHERE l.user_id = ?
     GROUP BY l.id
     ORDER BY l.created_at DESC

@@ -8,10 +8,12 @@ const SECRET = new TextEncoder().encode(
 const COOKIE_NAME = 'em_token'
 
 export interface SessionUser {
-  id: string
+  id: string       // workspace id: owner's user_id for members, own id for owners
+  memberId: string // actual logged-in user id (= id for owners)
   email: string
   name: string
   role: string
+  isOwner: boolean
 }
 
 export async function signToken(payload: SessionUser): Promise<string> {
@@ -25,7 +27,16 @@ export async function signToken(payload: SessionUser): Promise<string> {
 export async function verifyToken(token: string): Promise<SessionUser | null> {
   try {
     const { payload } = await jwtVerify(token, SECRET)
-    return payload as unknown as SessionUser
+    const p = payload as unknown as Partial<SessionUser> & { id: string; email: string; name: string; role: string }
+    // backwards-compat: old tokens without memberId
+    return {
+      id: p.id,
+      memberId: p.memberId ?? p.id,
+      email: p.email,
+      name: p.name,
+      role: p.role,
+      isOwner: p.isOwner ?? true,
+    }
   } catch {
     return null
   }

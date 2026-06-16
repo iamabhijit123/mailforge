@@ -9,12 +9,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!session) redirect('/login')
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F5F6F8]">
       <SchedulerPoller />
       <Sidebar />
-      <div className="pl-56">
+      <div className="pl-56 flex flex-col min-h-screen">
         <Header user={session} />
-        <main className="p-6">{children}</main>
+        <main className="flex-1 p-6 max-w-[1400px] w-full">{children}</main>
       </div>
     </div>
   )

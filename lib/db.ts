@@ -221,6 +221,43 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_sc_scheduled ON scheduled_campaigns(scheduled_at, status);
   `)
 
+  // contact_notes table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contact_notes (
+      id TEXT PRIMARY KEY,
+      contact_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (contact_id) REFERENCES contacts(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_contact_notes ON contact_notes(contact_id);
+  `)
+
+  // team_members table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS team_members (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL,
+      member_user_id TEXT,
+      email TEXT NOT NULL,
+      name TEXT,
+      role TEXT DEFAULT 'member',
+      status TEXT DEFAULT 'pending',
+      invite_token TEXT UNIQUE,
+      invited_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_team_members_owner ON team_members(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_team_members_token ON team_members(invite_token);
+  `)
+
   // Migrations: add columns that may not exist in older databases
   try { db.exec(`ALTER TABLE settings ADD COLUMN anthropic_api_key TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN workspace_id TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN zerobounce_api_key TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN monday_api_key TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE template_group_items ADD COLUMN item_list_id TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE template_group_items ADD COLUMN recipient_email TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT`) } catch {}
 }
