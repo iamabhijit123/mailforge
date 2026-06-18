@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Toast } from '@/components/ui'
-import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal } from 'lucide-react'
+import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ScheduleDateTimePicker } from '@/components/ui'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
@@ -120,12 +120,15 @@ export default function CampaignsPage() {
   const [scheduleListIds, setScheduleListIds] = useState<string[]>([])
   const [sendListIds, setSendListIds] = useState<string[]>([])
   const [actionLoading, setActionLoading] = useState(false)
+  const [syncingStats, setSyncingStats] = useState(false)
 
-  async function load() {
+  async function load(syncId?: string) {
     const [cRes, lRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists')])
-    setCampaigns(await cRes.json())
+    const cs = await cRes.json()
+    setCampaigns(cs)
     setLists(await lRes.json())
     setLoading(false)
+    if (syncId) setPreviewCampaign(cs.find((c: Campaign) => c.id === syncId) ?? null)
   }
   useEffect(() => { load() }, [])
 
@@ -149,6 +152,28 @@ export default function CampaignsPage() {
       body: JSON.stringify({ name: `${c.name} (copy)`, subject: c.subject, html_body: c.html_body }),
     })
     if (res.ok) { load(); setToast({ msg: 'Campaign duplicated', type: 'success' }) }
+  }
+
+  async function syncStats(id: string) {
+    setSyncingStats(true)
+    try {
+      const res = await fetch(`/api/campaigns/${id}/refresh-stats`, { method: 'POST' })
+      const d = await res.json()
+      if (d.ok) {
+        await load(id)
+        const dbg = d.debug
+        let msg = `Synced from Postmark — ${d.stats?.uniqueOpens ?? 0} opens, ${d.stats?.uniqueClicks ?? 0} clicks`
+        if (dbg?.apiErrors?.length) msg = `Postmark API error: ${dbg.apiErrors[0]}`
+        else if (d.synced === 0) msg = d.error || 'No message IDs found — resend the campaign to enable tracking'
+        else if (dbg?.eventTypesFromPostmark?.length === 0) msg = `Synced (no events yet — Postmark shows: delivered only)`
+        else if (dbg?.eventTypesFromPostmark) msg += ` · Events: ${dbg.eventTypesFromPostmark.join(', ')}`
+        setToast({ msg, type: d.stats?.uniqueOpens > 0 ? 'success' : 'info' })
+      } else {
+        setToast({ msg: d.error || 'Sync failed', type: 'error' })
+      }
+    } finally {
+      setSyncingStats(false)
+    }
   }
 
   async function cancelSchedule(id: string) {
@@ -498,7 +523,7 @@ export default function CampaignsPage() {
                 </div>
 
                 <div className="p-4 flex flex-col gap-2.5">
-                  {/* SENT: report + copy */}
+                  {/* SENT: report + sync + copy */}
                   {previewCampaign.status === 'sent' && (
                     <>
                       <Link href={`/campaigns/${previewCampaign.id}/report`} className="block">
@@ -506,6 +531,11 @@ export default function CampaignsPage() {
                           <BarChart2 className="w-3.5 h-3.5 text-gray-400" /> View Report
                         </button>
                       </Link>
+                      <button onClick={() => syncStats(previewCampaign.id)} disabled={syncingStats}
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors shadow-sm">
+                        {syncingStats ? <span className="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-500 rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-gray-400" />}
+                        Sync Stats from Postmark
+                      </button>
                       <button onClick={() => duplicateCampaign(previewCampaign)} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
                         <Copy className="w-3.5 h-3.5 text-gray-400" /> Duplicate Campaign
                       </button>

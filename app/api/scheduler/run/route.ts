@@ -151,8 +151,10 @@ export async function POST() {
           Metadata: { campaign_id: campaignId },
         }])
         const sent = results.filter(r => r?.ErrorCode === 0).length
+        const messageId = results[0]?.MessageID || null
         db.prepare("UPDATE campaigns SET status = 'sent', sent_at = datetime('now'), total_recipients = ? WHERE id = ?").run(sent, campaignId)
         db.prepare('UPDATE campaign_stats SET sent = ? WHERE campaign_id = ?').run(sent, campaignId)
+        db.prepare('INSERT OR IGNORE INTO campaign_recipients (campaign_id, contact_id, contact_email, postmark_message_id) VALUES (?, ?, ?, ?)').run(campaignId, crypto.randomUUID(), item.recipient_email, messageId)
       } else {
         await executeCampaignSend(db, campaignId, item.user_id, postmarkKey, messageStream, companyInfo)
       }

@@ -21,7 +21,8 @@ export function generateEmailHtml(
   const contentBg = settings.contentBackground || '#ffffff'
   const font = settings.fontFamily || 'Arial, sans-serif'
 
-  const blocksHtml = blocks.map(b => renderBlock(b, font)).join('\n')
+  const safeBlocks = Array.isArray(blocks) ? blocks : []
+  const blocksHtml = safeBlocks.map(b => renderBlock(b, font)).join('\n')
 
   return `<!DOCTYPE html>
 <html lang="en">

@@ -41,7 +41,7 @@ export default function CampaignEditorPage() {
       setCampaign(c)
       setLists(ls)
       const parsedBlocks = parse<EmailBlock[]>(c.blocks, [])
-      setBlocks(parsedBlocks)
+      setBlocks(Array.isArray(parsedBlocks) ? parsedBlocks : [])
       setHtmlBody(c.html_body || '')
       setForm({
         name: c.name, subject: c.subject, preview_text: c.preview_text || '',

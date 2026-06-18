@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!contacts.length) return NextResponse.json({ error: 'No subscribed contacts in selected lists' }, { status: 400 })
 
   const blocks = parseJsonSafe(campaign.blocks as string, [])
-  const companyInfo = [settings.company_name, settings.company_address].filter(Boolean).join(' · ')
+  const companyInfo = settings ? [settings.company_name, settings.company_address].filter(Boolean).join(' · ') : ''
   const baseHtml = (campaign.html_body as string) || generateEmailHtml(blocks, {}, '{{unsubscribe_url}}', companyInfo)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 

@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send, Eye, MousePointer, UserX, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Send, Eye, MousePointer, UserX, AlertCircle, RefreshCw } from 'lucide-react'
 import { formatDateTime, formatPercent, formatDate } from '@/lib/utils'
-import { StatCard, Badge } from '@/components/ui'
+import { StatCard, Badge, Button, Toast } from '@/components/ui'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 interface ReportData {
@@ -24,10 +24,38 @@ export default function CampaignReportPage() {
   const { id } = useParams<{ id: string }>()
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
+
+  function loadReport() {
+    return fetch(`/api/campaigns/${id}/report`).then(r => r.json()).then(setData)
+  }
 
   useEffect(() => {
-    fetch(`/api/campaigns/${id}/report`).then(r => r.json()).then(setData).finally(() => setLoading(false))
+    loadReport().finally(() => setLoading(false))
   }, [id])
+
+  async function refreshStats() {
+    setRefreshing(true)
+    try {
+      const res = await fetch(`/api/campaigns/${id}/refresh-stats`, { method: 'POST' })
+      const d = await res.json()
+      if (d.ok) {
+        await loadReport()
+        const dbg = d.debug
+        let msg = `Synced — ${d.stats?.uniqueOpens ?? 0} opens, ${d.stats?.uniqueClicks ?? 0} clicks`
+        if (dbg?.apiErrors?.length) msg = `Postmark API error: ${dbg.apiErrors[0]}`
+        else if (d.synced === 0) msg = d.error || 'No message IDs found'
+        else if (dbg?.eventTypesFromPostmark?.length === 0) msg = 'Delivered but no opens/clicks recorded yet'
+        else if (dbg?.eventTypesFromPostmark) msg += ` · Events from Postmark: ${dbg.eventTypesFromPostmark.join(', ')}`
+        setToast({ msg, type: d.stats?.uniqueOpens > 0 ? 'success' : 'info' })
+      } else {
+        setToast({ msg: d.error || 'Sync failed', type: 'error' })
+      }
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
   if (!data) return <div className="text-center mt-20 text-gray-500">Report not found</div>
@@ -37,12 +65,18 @@ export default function CampaignReportPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/campaigns" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-5 h-5" /></Link>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{campaign.name}</h1>
-          <p className="text-sm text-gray-500">Sent {formatDateTime(campaign.sent_at)} · {campaign.from_name} &lt;{campaign.from_email}&gt;</p>
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Link href="/campaigns" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-5 h-5" /></Link>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{campaign.name}</h1>
+            <p className="text-sm text-gray-500">Sent {formatDateTime(campaign.sent_at)} · {campaign.from_name} &lt;{campaign.from_email}&gt;</p>
+          </div>
         </div>
+        <Button variant="outline" size="sm" onClick={refreshStats} loading={refreshing}>
+          <RefreshCw className="w-3.5 h-3.5" /> Sync Stats from Postmark
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
