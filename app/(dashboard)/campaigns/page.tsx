@@ -123,6 +123,13 @@ export default function CampaignsPage() {
   const [syncingStats, setSyncingStats] = useState(false)
   const [showCreateType, setShowCreateType] = useState(false)
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('new=1')) {
+      setShowCreateType(true)
+      window.history.replaceState({}, '', '/campaigns')
+    }
+  }, [])
+
   async function load(syncId?: string) {
     const [cRes, lRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists')])
     const cs = await cRes.json()
@@ -369,11 +376,12 @@ export default function CampaignsPage() {
               {campaigns.length === 0 ? 'Create your first email campaign to get started.' : 'Try adjusting your filters.'}
             </p>
             {campaigns.length === 0 && (
-              <Link href="/campaigns/new">
-                <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto">
-                  <Plus className="w-4 h-4" /> Create Campaign
-                </button>
-              </Link>
+              <button
+                onClick={() => setShowCreateType(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto"
+              >
+                <Plus className="w-4 h-4" /> Create Campaign
+              </button>
             )}
           </div>
         ) : (
