@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Toast } from '@/components/ui'
-import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw, RotateCcw } from 'lucide-react'
+import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ScheduleDateTimePicker } from '@/components/ui'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
@@ -121,14 +121,6 @@ export default function CampaignsPage() {
   const [sendListIds, setSendListIds] = useState<string[]>([])
   const [actionLoading, setActionLoading] = useState(false)
   const [syncingStats, setSyncingStats] = useState(false)
-  const [showCreateType, setShowCreateType] = useState(false)
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.search.includes('new=1')) {
-      setShowCreateType(true)
-      window.history.replaceState({}, '', '/campaigns')
-    }
-  }, [])
 
   async function load(syncId?: string) {
     const [cRes, lRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists')])
@@ -297,12 +289,11 @@ export default function CampaignsPage() {
               <Settings className="w-4 h-4" /> Settings
             </button>
           </Link>
-          <button
-            onClick={() => setShowCreateType(true)}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
-          >
-            <Plus className="w-4 h-4" /> Create a campaign
-          </button>
+          <Link href="/campaigns/new">
+            <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm">
+              <Plus className="w-4 h-4" /> Create a campaign
+            </button>
+          </Link>
         </div>
       </div>
 
@@ -376,12 +367,11 @@ export default function CampaignsPage() {
               {campaigns.length === 0 ? 'Create your first email campaign to get started.' : 'Try adjusting your filters.'}
             </p>
             {campaigns.length === 0 && (
-              <button
-                onClick={() => setShowCreateType(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto"
-              >
-                <Plus className="w-4 h-4" /> Create Campaign
-              </button>
+              <Link href="/campaigns/new">
+                <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-colors mx-auto">
+                  <Plus className="w-4 h-4" /> Create Campaign
+                </button>
+              </Link>
             )}
           </div>
         ) : (
@@ -667,45 +657,6 @@ export default function CampaignsPage() {
         </div>
       )}
 
-      {/* Campaign type selection modal */}
-      {showCreateType && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-bold text-gray-900">What kind of campaign?</h2>
-              <button onClick={() => setShowCreateType(false)} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>
-            </div>
-            <div className="space-y-3">
-              <Link href="/campaigns/new" onClick={() => setShowCreateType(false)}>
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-blue-400 hover:bg-blue-50/40 transition-all cursor-pointer group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                      <Send className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm text-gray-900">One-time Campaign</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Send an email to your list once — a newsletter, announcement, or promotion.</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-              <Link href="/recurring-campaigns/new" onClick={() => setShowCreateType(false)}>
-                <div className="p-4 border-2 border-gray-200 rounded-xl hover:border-purple-400 hover:bg-purple-50/40 transition-all cursor-pointer group">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                      <RotateCcw className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-sm text-gray-900">Recurring Campaign</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Automatically send on a schedule — daily, weekly, or monthly — with rotating templates.</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -25,7 +25,7 @@ const nav: NavItem[] = [
     icon: Send,
     children: [
       { href: '/campaigns', label: 'All Campaigns' },
-      { href: '/campaigns?new=1', label: 'New Campaign' },
+      { href: '/campaigns/new', label: 'New Campaign' },
     ],
   },
   {
