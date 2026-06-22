@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, List, Mail, FileText, Zap,
   BarChart2, Settings, LogOut, Send, ChevronDown, Plus,
-  Sparkles, Plug,
+  Sparkles, Plug, RotateCcw,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -38,6 +38,7 @@ const nav: NavItem[] = [
     ],
   },
   { href: '/templates', label: 'Templates', icon: FileText },
+  { href: '/recurring-campaigns', label: 'Recurring', icon: RotateCcw },
   { href: '/automation', label: 'Automation', icon: Zap },
   { href: '/analytics', label: 'Analytics', icon: BarChart2 },
   { href: '/integrations', label: 'Integrations', icon: Plug },

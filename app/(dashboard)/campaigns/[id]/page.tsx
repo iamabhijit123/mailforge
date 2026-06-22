@@ -11,7 +11,7 @@ import { parseJsonSafe as parse } from '@/lib/utils'
 
 interface Campaign {
   id: string; name: string; subject: string; preview_text: string | null
-  from_name: string; from_email: string; reply_to: string | null
+  from_name: string; from_email: string; reply_to: string | null; cc_emails: string | null
   list_ids: string; blocks: string; html_body: string | null; status: string
 }
 interface List { id: string; name: string; contact_count: number }
@@ -31,7 +31,7 @@ export default function CampaignEditorPage() {
   const [showSchedule, setShowSchedule] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
-  const [form, setForm] = useState({ name: '', subject: '', preview_text: '', from_name: '', from_email: '', reply_to: '', list_ids: [] as string[] })
+  const [form, setForm] = useState({ name: '', subject: '', preview_text: '', from_name: '', from_email: '', reply_to: '', cc_emails: '', list_ids: [] as string[] })
 
   useEffect(() => {
     Promise.all([
@@ -46,6 +46,7 @@ export default function CampaignEditorPage() {
       setForm({
         name: c.name, subject: c.subject, preview_text: c.preview_text || '',
         from_name: c.from_name, from_email: c.from_email, reply_to: c.reply_to || '',
+        cc_emails: (parse<string[]>(c.cc_emails, [])).join(', '),
         list_ids: parse<string[]>(c.list_ids, []),
       })
       setLoading(false)
@@ -59,9 +60,10 @@ export default function CampaignEditorPage() {
 
   async function save() {
     setSaving(true)
+    const ccArray = form.cc_emails ? form.cc_emails.split(',').map(e => e.trim()).filter(Boolean) : []
     await fetch(`/api/campaigns/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, blocks, html_body: htmlBody }),
+      body: JSON.stringify({ ...form, cc_emails: ccArray, blocks, html_body: htmlBody }),
     })
     setSaving(false)
     setToast({ msg: 'Saved', type: 'success' })
@@ -156,6 +158,7 @@ export default function CampaignEditorPage() {
             <Input label="From Name" value={form.from_name} onChange={set('from_name')} disabled={isSent} />
             <Input label="From Email" type="email" value={form.from_email} onChange={set('from_email')} disabled={isSent} />
             <Input label="Reply-To" type="email" value={form.reply_to} onChange={set('reply_to')} disabled={isSent} />
+            <Input label="CC (optional, comma-separated)" value={form.cc_emails} onChange={set('cc_emails')} disabled={isSent} placeholder="cc1@example.com, cc2@example.com" />
           </div>
 
           <div className="space-y-2 border-t pt-3">

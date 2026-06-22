@@ -26,14 +26,15 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (campaign.status === 'sent') return NextResponse.json({ error: 'Cannot edit a sent campaign' }, { status: 400 })
 
   const body = await req.json()
-  const fields = ['name', 'subject', 'preview_text', 'from_name', 'from_email', 'reply_to', 'list_ids', 'blocks', 'html_body', 'scheduled_at', 'status']
+  const fields = ['name', 'subject', 'preview_text', 'from_name', 'from_email', 'reply_to', 'cc_emails', 'list_ids', 'blocks', 'html_body', 'scheduled_at', 'status']
+  const jsonFields = ['list_ids', 'blocks', 'cc_emails']
   const updates: string[] = []
   const values: unknown[] = []
 
   for (const f of fields) {
     if (f in body) {
       updates.push(`${f} = ?`)
-      values.push(f === 'list_ids' || f === 'blocks' ? JSON.stringify(body[f]) : body[f])
+      values.push(jsonFields.includes(f) ? JSON.stringify(body[f]) : body[f])
     }
   }
   if (updates.length) {

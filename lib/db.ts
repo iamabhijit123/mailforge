@@ -252,6 +252,54 @@ function initSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_team_members_token ON team_members(invite_token);
   `)
 
+  // Template folders
+  try { db.exec(`CREATE TABLE IF NOT EXISTS template_folders (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    color TEXT DEFAULT '#6366f1',
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`) } catch {}
+
+  // Recurring campaigns
+  try { db.exec(`CREATE TABLE IF NOT EXISTS recurring_campaigns (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    from_name TEXT NOT NULL,
+    from_email TEXT NOT NULL,
+    reply_to TEXT,
+    cc_emails TEXT DEFAULT '[]',
+    list_ids TEXT DEFAULT '[]',
+    template_folder_id TEXT,
+    frequency TEXT NOT NULL DEFAULT 'weekly',
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    send_time TEXT NOT NULL DEFAULT '09:00',
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    status TEXT DEFAULT 'active',
+    rotation_index INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  )`) } catch {}
+  try { db.exec(`CREATE TABLE IF NOT EXISTS recurring_sends (
+    id TEXT PRIMARY KEY,
+    recurring_campaign_id TEXT NOT NULL,
+    scheduled_date TEXT NOT NULL,
+    scheduled_time TEXT NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    template_id TEXT,
+    campaign_id TEXT,
+    status TEXT DEFAULT 'pending',
+    is_adjusted INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (recurring_campaign_id) REFERENCES recurring_campaigns(id) ON DELETE CASCADE
+  )`) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_recurring_sends_scheduled ON recurring_sends(scheduled_at, status)`) } catch {}
+
   // Migrations: add columns that may not exist in older databases
   try { db.exec(`ALTER TABLE settings ADD COLUMN anthropic_api_key TEXT`) } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN workspace_id TEXT`) } catch {}
@@ -260,4 +308,6 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE template_group_items ADD COLUMN item_list_id TEXT`) } catch {}
   try { db.exec(`ALTER TABLE template_group_items ADD COLUMN recipient_email TEXT`) } catch {}
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE campaigns ADD COLUMN cc_emails TEXT DEFAULT '[]'`) } catch {}
+  try { db.exec(`ALTER TABLE templates ADD COLUMN folder_id TEXT`) } catch {}
 }

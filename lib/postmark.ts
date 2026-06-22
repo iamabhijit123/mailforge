@@ -41,6 +41,7 @@ export interface BatchSendMessage {
   HtmlBody: string
   TextBody?: string
   ReplyTo?: string
+  Cc?: string
   MessageStream?: string
   TrackOpens?: boolean
   Metadata?: Record<string, string>
@@ -62,6 +63,7 @@ export async function sendBatch(apiKey: string, messages: BatchSendMessage[]) {
         HtmlBody: m.HtmlBody,
         TextBody: m.TextBody || stripHtml(m.HtmlBody),
         ReplyTo: m.ReplyTo,
+        ...(m.Cc ? { Cc: m.Cc } : {}),
         MessageStream: m.MessageStream || 'broadcast',
         TrackOpens: m.TrackOpens !== false,
         TrackLinks: LinkTrackingOptions.HtmlOnly,

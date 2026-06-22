@@ -4,6 +4,7 @@ import { getDb } from '@/lib/db'
 import { sendBatch } from '@/lib/postmark'
 import { generateEmailHtml, personalizeHtml } from '@/lib/email-html'
 import { parseJsonSafe } from '@/lib/utils'
+import { cleanSubject } from '@/lib/email-utils'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession()
@@ -48,15 +49,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   db.prepare("UPDATE campaigns SET status = 'sending', updated_at = datetime('now') WHERE id = ?").run(id)
 
+  const ccEmails = parseJsonSafe<string[]>(campaign.cc_emails as string, [])
+  const ccStr = ccEmails.filter(Boolean).join(', ')
+
   const messages = contacts.map(contact => {
     const unsubUrl = `${appUrl}/api/unsubscribe?email=${encodeURIComponent(contact.email)}&uid=${session.id}`
     const html = personalizeHtml(baseHtml, contact, unsubUrl)
     return {
       From: `${campaign.from_name} <${campaign.from_email}>`,
       To: contact.email,
-      Subject: campaign.subject as string,
+      Subject: cleanSubject(campaign.subject as string),
       HtmlBody: html,
       ReplyTo: campaign.reply_to as string | undefined,
+      ...(ccStr ? { Cc: ccStr } : {}),
       MessageStream: (settings?.postmark_message_stream as string) || 'broadcast',
       TrackOpens: true,
       Metadata: { campaign_id: id, contact_id: contact.id },

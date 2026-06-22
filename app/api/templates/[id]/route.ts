@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!tpl) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()
-  const { name, category, subject, blocks, html_body } = body
+  const { name, category, subject, blocks, html_body, folder_id } = body
   const finalHtml = html_body || (blocks ? generateEmailHtml(blocks) : undefined)
 
   const updates: string[] = []
@@ -32,6 +32,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (subject !== undefined) { updates.push('subject = ?'); values.push(subject) }
   if (blocks) { updates.push('blocks = ?'); values.push(JSON.stringify(blocks)) }
   if (finalHtml) { updates.push('html_body = ?'); values.push(finalHtml) }
+  if ('folder_id' in body) { updates.push('folder_id = ?'); values.push(folder_id ?? null) }
   if (updates.length) {
     updates.push("updated_at = datetime('now')")
     db.prepare(`UPDATE templates SET ${updates.join(', ')} WHERE id = ?`).run(...values, id)

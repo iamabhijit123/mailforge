@@ -3,6 +3,7 @@ import { getDb } from '@/lib/db'
 import { sendBatch } from '@/lib/postmark'
 import { generateEmailHtml, personalizeHtml } from '@/lib/email-html'
 import { parseJsonSafe } from '@/lib/utils'
+import { cleanSubject } from '@/lib/email-utils'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
@@ -33,7 +34,7 @@ async function executeCampaignSend(
     return {
       From: `${campaign.from_name} <${campaign.from_email}>`,
       To: contact.email,
-      Subject: campaign.subject as string,
+      Subject: cleanSubject(campaign.subject as string),
       HtmlBody: html,
       ReplyTo: campaign.reply_to as string | undefined,
       MessageStream: messageStream || 'broadcast',
@@ -108,8 +109,8 @@ export async function POST() {
       const companyInfo = settings ? [settings.company_name, settings.company_address].filter(Boolean).join(' · ') : ''
       const htmlBody = (template.html_body as string) || generateEmailHtml(blocks, {}, '{{unsubscribe_url}}', companyInfo)
       const subject = item.subject || (template.subject as string) || 'No Subject'
-      const fromName = item.group_from_name || (settings.sender_name as string) || ''
-      const fromEmail = item.group_from_email || (settings.sender_email as string) || ''
+      const fromName = item.group_from_name || (settings?.sender_name as string) || ''
+      const fromEmail = item.group_from_email || (settings?.sender_email as string) || ''
       // item_list_id takes precedence over group's list_id; recipient_email overrides both for single-email sends
       const effectiveListId = item.item_list_id || item.list_id
       const listIds = effectiveListId ? JSON.stringify([effectiveListId]) : '[]'
@@ -140,7 +141,7 @@ export async function POST() {
       if (item.recipient_email) {
         // Single-email send — bypass list lookup, send directly to the specified address
         const unsubUrl = `${APP_URL}/api/unsubscribe?email=${encodeURIComponent(item.recipient_email)}&uid=${item.user_id}`
-        const html = personalizeHtml(htmlBody, { first_name: null, last_name: null, email: item.recipient_email, id: '' }, unsubUrl)
+        const html = personalizeHtml(htmlBody, { first_name: null, last_name: null, email: item.recipient_email }, unsubUrl)
         const results = await sendBatch(postmarkKey, [{
           From: `${fromName} <${fromEmail}>`,
           To: item.recipient_email,
@@ -164,6 +165,62 @@ export async function POST() {
     } catch (e) {
       results.errors.push(`Group item ${item.id}: ${(e as Error).message}`)
       db.prepare("UPDATE template_group_items SET status = 'error' WHERE id = ?").run(item.id)
+    }
+  }
+
+  // 3. Process due recurring sends
+  const dueRecurring = db.prepare(`
+    SELECT rs.*, rc.user_id, rc.from_name, rc.from_email, rc.reply_to, rc.cc_emails,
+           rc.list_ids, rc.template_folder_id, rc.rotation_index, rc.subject, rc.name as rc_name
+    FROM recurring_sends rs
+    JOIN recurring_campaigns rc ON rc.id = rs.recurring_campaign_id
+    WHERE rs.status = 'pending' AND rs.scheduled_at <= ? AND rc.status = 'active'
+  `).all(now) as Array<{
+    id: string; recurring_campaign_id: string; user_id: string
+    from_name: string; from_email: string; reply_to: string | null; cc_emails: string
+    list_ids: string; template_folder_id: string | null; rotation_index: number
+    subject: string; rc_name: string
+  }>
+
+  for (const rs of dueRecurring) {
+    try {
+      const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(rs.user_id) as Record<string, unknown> | null
+      const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
+      if (!postmarkKey) continue
+
+      // Pick template by rotation index
+      const templates = rs.template_folder_id
+        ? db.prepare('SELECT * FROM templates WHERE folder_id = ? AND user_id = ? ORDER BY created_at ASC').all(rs.template_folder_id, rs.user_id) as Array<Record<string, unknown>>
+        : []
+      const template = templates.length ? templates[rs.rotation_index % templates.length] : null
+
+      const companyInfo = settings ? [settings.company_name, settings.company_address].filter(Boolean).join(' · ') : ''
+      const blocks = parseJsonSafe<Parameters<typeof generateEmailHtml>[0]>(template?.blocks as string, [])
+      const htmlBody = (template?.html_body as string) || generateEmailHtml(blocks, {}, '{{unsubscribe_url}}', companyInfo)
+
+      const campaignId = crypto.randomUUID()
+      const subject = cleanSubject(rs.subject)
+      db.prepare(`INSERT INTO campaigns (id, user_id, name, subject, from_name, from_email, reply_to, list_ids, blocks, html_body, status, template_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?)`)
+        .run(campaignId, rs.user_id, `[Recurring] ${rs.rc_name}`, subject, rs.from_name, rs.from_email, rs.reply_to,
+          rs.list_ids, template?.blocks || '[]', template?.html_body || null, template?.id || null)
+      db.prepare('INSERT INTO campaign_stats (campaign_id) VALUES (?)').run(campaignId)
+
+      const messageStream = (settings?.postmark_message_stream as string) || 'broadcast'
+      await executeCampaignSend(db, campaignId, rs.user_id, postmarkKey, messageStream, companyInfo)
+
+      // Mark send done, increment rotation
+      db.prepare("UPDATE recurring_sends SET status = 'sent', campaign_id = ? WHERE id = ?").run(campaignId, rs.id)
+      db.prepare('UPDATE recurring_campaigns SET rotation_index = rotation_index + 1 WHERE id = ?').run(rs.recurring_campaign_id)
+
+      // Mark completed if all sends done
+      const pending = db.prepare("SELECT COUNT(*) as n FROM recurring_sends WHERE recurring_campaign_id = ? AND status = 'pending'").get(rs.recurring_campaign_id) as { n: number }
+      if (pending.n === 0) db.prepare("UPDATE recurring_campaigns SET status = 'completed' WHERE id = ?").run(rs.recurring_campaign_id)
+
+      results.group_items++
+    } catch (e) {
+      results.errors.push(`Recurring send ${rs.id}: ${(e as Error).message}`)
+      db.prepare("UPDATE recurring_sends SET status = 'error' WHERE id = ?").run(rs.id)
     }
   }
 
