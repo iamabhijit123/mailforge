@@ -223,87 +223,119 @@ function FolderSidebar({
   onAdd: () => void
   userTemplateCount: number
 }) {
-  const [renaming, setRenaming] = useState<string | null>(null)
+  // Use '' as sentinel — no real folder id is ever an empty string
+  const [renamingId, setRenamingId] = useState('')
   const [renameVal, setRenameVal] = useState('')
-  const [menuOpen, setMenuOpen] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const [menuOpenId, setMenuOpenId] = useState('')
+  const sidebarRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    function h(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(null) }
+    function h(e: MouseEvent) {
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) {
+        setMenuOpenId('')
+      }
+    }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
   async function renameFolder(id: string) {
-    if (!renameVal.trim()) return
-    await fetch(`/api/template-folders/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: renameVal.trim() }) })
-    setRenaming(null); window.location.reload()
+    if (!renameVal.trim()) { setRenamingId(''); return }
+    await fetch(`/api/template-folders/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: renameVal.trim() }),
+    })
+    setRenamingId('')
+    window.location.reload()
   }
+
   async function deleteFolder(id: string) {
     if (!confirm('Delete this folder? Templates inside will be unfoldered.')) return
     await fetch(`/api/template-folders/${id}`, { method: 'DELETE' })
     window.location.reload()
   }
 
-  const items: Array<{ id: string | null | 'unfiled'; label: string; count: number; color?: string }> = [
-    { id: null, label: 'All Templates', count: userTemplateCount },
-    { id: 'unfiled', label: 'Unfiled', count: userTemplateCount - folders.reduce((s, f) => s + f.template_count, 0) },
-    ...folders.map(f => ({ id: f.id, label: f.name, count: f.template_count, color: f.color })),
-  ]
+  const unfiledCount = userTemplateCount - folders.reduce((s, f) => s + f.template_count, 0)
 
   return (
-    <div className="w-44 flex-shrink-0 border-r border-gray-100 pr-3 space-y-0.5">
-      {items.map(item => (
-        <div key={String(item.id)} className="relative">
-          {renaming !== null && renaming === item.id ? (
+    <div ref={sidebarRef} className="w-44 flex-shrink-0 border-r border-gray-100 pr-3 space-y-0.5">
+      {/* All Templates */}
+      <button
+        onClick={() => onSelect(null)}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${selected === null ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      >
+        <FileText className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
+        <span className="flex-1 text-left text-xs">All Templates</span>
+        <span className="text-xs text-gray-400">{userTemplateCount}</span>
+      </button>
+
+      {/* Unfiled */}
+      <button
+        onClick={() => onSelect('unfiled')}
+        className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors ${selected === 'unfiled' ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+      >
+        <FolderOpen className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
+        <span className="flex-1 text-left text-xs">Unfiled</span>
+        <span className="text-xs text-gray-400">{unfiledCount}</span>
+      </button>
+
+      {/* Named folders */}
+      {folders.map(folder => (
+        <div key={folder.id} className="relative">
+          {renamingId === folder.id ? (
             <div className="flex gap-1 items-center py-1">
               <input
                 autoFocus
                 value={renameVal}
                 onChange={e => setRenameVal(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') renameFolder(item.id as string); if (e.key === 'Escape') setRenaming(null) }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') renameFolder(folder.id)
+                  if (e.key === 'Escape') setRenamingId('')
+                }}
                 className="flex-1 text-xs border border-blue-400 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
-              <button onClick={() => renameFolder(item.id as string)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Check className="w-3.5 h-3.5" /></button>
-              <button onClick={() => setRenaming(null)} className="p-1 text-gray-400 hover:bg-gray-100 rounded"><X className="w-3.5 h-3.5" /></button>
+              <button onClick={() => renameFolder(folder.id)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => setRenamingId('')} className="p-1 text-gray-400 hover:bg-gray-100 rounded">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           ) : (
             <button
-              onClick={() => onSelect(item.id)}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-sm transition-colors group ${selected === item.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
+              onClick={() => onSelect(folder.id)}
+              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors group ${selected === folder.id ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'}`}
             >
-              {item.color ? (
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-              ) : item.id === null ? (
-                <FileText className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
-              ) : (
-                <FolderOpen className="w-3.5 h-3.5 flex-shrink-0 text-gray-400" />
-              )}
-              <span className="flex-1 text-left truncate text-xs">{item.label}</span>
-              <span className="text-xs text-gray-400">{item.count}</span>
-              {item.color && (
-                <button
-                  onClick={e => { e.stopPropagation(); setMenuOpen(item.id as string) }}
-                  className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200 transition-opacity"
-                >
-                  <MoreVertical className="w-3 h-3 text-gray-400" />
-                </button>
-              )}
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: folder.color }} />
+              <span className="flex-1 text-left truncate text-xs">{folder.name}</span>
+              <span className="text-xs text-gray-400">{folder.template_count}</span>
+              <span
+                onClick={e => { e.stopPropagation(); setMenuOpenId(menuOpenId === folder.id ? '' : folder.id) }}
+                className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-gray-200 transition-opacity"
+              >
+                <MoreVertical className="w-3 h-3 text-gray-400" />
+              </span>
             </button>
           )}
-          {menuOpen !== null && menuOpen === item.id && (
-            <div ref={menuRef} className="absolute right-0 top-8 w-36 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1">
-              <button onClick={() => { setRenameVal(item.label); setRenaming(item.id as string); setMenuOpen(null) }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
+          {menuOpenId === folder.id && (
+            <div className="absolute right-0 top-8 w-36 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1">
+              <button
+                onClick={() => { setRenameVal(folder.name); setRenamingId(folder.id); setMenuOpenId('') }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
                 <Edit2 className="w-3 h-3 text-gray-400" /> Rename
               </button>
-              <button onClick={() => { setMenuOpen(null); deleteFolder(item.id as string) }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50">
+              <button
+                onClick={() => { setMenuOpenId(''); deleteFolder(folder.id) }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-600 hover:bg-red-50"
+              >
                 <Trash2 className="w-3 h-3" /> Delete folder
               </button>
             </div>
           )}
         </div>
       ))}
+
       <button
         onClick={onAdd}
         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors mt-1"
