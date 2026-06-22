@@ -2,7 +2,10 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 
-const DATA_DIR = path.join(process.cwd(), 'data')
+// On Vercel (read-only filesystem) use /tmp; locally use ./data
+const DATA_DIR = process.env.VERCEL
+  ? '/tmp/mailforge-data'
+  : path.join(process.cwd(), 'data')
 const DB_PATH = path.join(DATA_DIR, 'app.db')
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
