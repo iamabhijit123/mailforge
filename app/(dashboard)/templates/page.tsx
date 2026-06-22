@@ -254,7 +254,7 @@ function FolderSidebar({
     <div className="w-44 flex-shrink-0 border-r border-gray-100 pr-3 space-y-0.5">
       {items.map(item => (
         <div key={String(item.id)} className="relative">
-          {renaming === item.id ? (
+          {renaming !== null && renaming === item.id ? (
             <div className="flex gap-1 items-center py-1">
               <input
                 autoFocus
@@ -290,7 +290,7 @@ function FolderSidebar({
               )}
             </button>
           )}
-          {menuOpen === item.id && (
+          {menuOpen !== null && menuOpen === item.id && (
             <div ref={menuRef} className="absolute right-0 top-8 w-36 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1">
               <button onClick={() => { setRenameVal(item.label); setRenaming(item.id as string); setMenuOpen(null) }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50">
