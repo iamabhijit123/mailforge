@@ -5,11 +5,50 @@ import { useRouter } from 'next/navigation'
 import { Toast } from '@/components/ui'
 import {
   ChevronRight, ChevronLeft, Check, RotateCcw, Users, Calendar,
-  Clock, FolderOpen, Send, AlertCircle,
+  Clock, FolderOpen, Send, AlertCircle, ArrowRight,
 } from 'lucide-react'
 import Link from 'next/link'
 
 interface List { id: string; name: string; contact_count: number }
+
+function NoListsBanner() {
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 flex gap-4 items-start">
+      <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+      <div className="flex-1">
+        <p className="font-semibold text-amber-900 mb-1">You need a contact list first</p>
+        <p className="text-sm text-amber-700 mb-3">
+          Recurring campaigns require at least one contact list. Create a list and add contacts before setting up a schedule.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/lists" className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-colors">
+            <ArrowRight className="w-3.5 h-3.5" /> Create a Contact List
+          </Link>
+          <Link href="/contacts" className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 text-xs font-bold rounded-lg transition-colors">
+            <Users className="w-3.5 h-3.5" /> Add Contacts
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmptyListsBanner({ lists }: { lists: List[] }) {
+  const allEmpty = lists.every(l => (l.contact_count || 0) === 0)
+  if (!allEmpty) return null
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 flex gap-3 items-start">
+      <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-sm font-semibold text-blue-900 mb-0.5">Your lists have no contacts yet</p>
+        <p className="text-xs text-blue-700 mb-2">The campaign will have nobody to send to. Add contacts to a list first.</p>
+        <Link href="/contacts" className="inline-flex items-center gap-1 text-xs font-bold text-blue-700 hover:underline">
+          <ArrowRight className="w-3 h-3" /> Go add contacts →
+        </Link>
+      </div>
+    </div>
+  )
+}
 interface FolderItem { id: string; name: string; color: string; template_count: number }
 
 const STEPS = [
@@ -175,22 +214,25 @@ export default function NewRecurringCampaignPage() {
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Send to Lists *</label>
-              {lists.length === 0 ? (
-                <p className="text-sm text-gray-500">No lists found. <Link href="/lists" className="text-blue-600 hover:underline">Create a list first.</Link></p>
-              ) : (
-                <div className="space-y-1.5 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2">
-                  {lists.map(l => (
-                    <label key={l.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition-colors ${form.list_ids.includes(l.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'}`}>
-                      <input type="checkbox" checked={form.list_ids.includes(l.id)} onChange={() => toggleList(l.id)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
-                      <span className="flex-1 text-sm font-medium text-gray-900">{l.name}</span>
-                      <span className="text-xs text-gray-400">{(l.contact_count || 0).toLocaleString()} contacts</span>
-                    </label>
-                  ))}
+            {lists.length === 0 ? (
+              <NoListsBanner />
+            ) : (
+              <div className="space-y-3">
+                <EmptyListsBanner lists={lists} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Send to Lists *</label>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2">
+                    {lists.map(l => (
+                      <label key={l.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition-colors ${form.list_ids.includes(l.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'}`}>
+                        <input type="checkbox" checked={form.list_ids.includes(l.id)} onChange={() => toggleList(l.id)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                        <span className="flex-1 text-sm font-medium text-gray-900">{l.name}</span>
+                        <span className="text-xs text-gray-400">{(l.contact_count || 0).toLocaleString()} contacts</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 

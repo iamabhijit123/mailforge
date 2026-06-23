@@ -4,7 +4,7 @@ import { use, useCallback, useEffect, useRef, useState } from 'react'
 import { Button, Badge, Modal, Toast } from '@/components/ui'
 import {
   Search, AlignJustify, MoreHorizontal, ChevronLeft, ChevronRight,
-  Mail, UserMinus
+  Mail, UserMinus, UserPlus, X
 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import Link from 'next/link'
@@ -12,6 +12,103 @@ import { useRouter } from 'next/navigation'
 
 interface List { id: string; name: string; description: string | null; contact_count: number; subscribed_count: number; created_at: string }
 interface Contact { id: string; email: string; first_name: string | null; last_name: string | null; company: string | null; status: string; created_at: string }
+
+function AddContactsModal({ listId, onClose, onAdded }: { listId: string; onClose: () => void; onAdded: () => void }) {
+  const [allContacts, setAllContacts] = useState<Contact[]>([])
+  const [q, setQ] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/contacts?limit=500').then(r => r.json()).then(d => setAllContacts(Array.isArray(d.contacts) ? d.contacts : []))
+  }, [])
+
+  const filtered = allContacts.filter(c =>
+    !q ||
+    c.email.toLowerCase().includes(q.toLowerCase()) ||
+    (c.first_name || '').toLowerCase().includes(q.toLowerCase()) ||
+    (c.last_name || '').toLowerCase().includes(q.toLowerCase())
+  )
+
+  function toggle(id: string) {
+    setSelected(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  async function addToList() {
+    if (!selected.size) return
+    setSaving(true)
+    await fetch(`/api/lists/${listId}/contacts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contact_ids: Array.from(selected) }),
+    })
+    setSaving(false)
+    onAdded()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col" style={{ maxHeight: '80vh' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <h2 className="font-bold text-gray-900">Add Contacts to List</h2>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="px-6 py-3 border-b border-gray-100 flex-shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              autoFocus
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search by name or email…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-2">
+          {allContacts.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-sm text-gray-500 mb-3">No contacts yet.</p>
+              <Link href="/contacts" onClick={onClose} className="text-sm text-blue-600 hover:underline font-semibold">Go to Contacts page to add some →</Link>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="py-8 text-center text-sm text-gray-400">No contacts match your search.</p>
+          ) : (
+            <div className="space-y-1">
+              {filtered.map(c => (
+                <label key={c.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors ${selected.has(c.id) ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50 border border-transparent'}`}>
+                  <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {[c.first_name, c.last_name].filter(Boolean).join(' ') || c.email}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{c.email}</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+          <span className="text-sm text-gray-500">{selected.size} selected</span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-semibold text-gray-600 border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
+            <button
+              onClick={addToList}
+              disabled={!selected.size || saving}
+              className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-xl transition-colors flex items-center gap-1.5"
+            >
+              {saving ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+              Add {selected.size > 0 ? selected.size : ''} to list
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const STATUS_COLORS: Record<string, 'success' | 'warning' | 'danger' | 'default'> = {
   subscribed: 'success', unsubscribed: 'warning', bounced: 'danger', spam: 'danger',
@@ -57,6 +154,7 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [editForm, setEditForm] = useState({ name: '', description: '' })
   const [showEdit, setShowEdit] = useState(false)
+  const [showAddContacts, setShowAddContacts] = useState(false)
   const [removing, setRemoving] = useState(false)
 
   async function loadList() {
@@ -129,6 +227,13 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
   return (
     <div className="space-y-5">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+      {showAddContacts && (
+        <AddContactsModal
+          listId={id}
+          onClose={() => setShowAddContacts(false)}
+          onAdded={() => { loadList(); loadContacts(); }}
+        />
+      )}
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -150,6 +255,12 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
           {list.description && <p className="text-sm text-gray-500 mt-0.5">{list.description}</p>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowAddContacts(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-semibold rounded-xl transition-colors shadow-sm"
+          >
+            <UserPlus className="w-3.5 h-3.5" /> Add Contacts
+          </button>
           <Link href="/campaigns">
             <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
               <Mail className="w-3.5 h-3.5" /> Send an email
@@ -213,10 +324,21 @@ export default function ListDetailPage({ params }: { params: Promise<{ id: strin
           <div className="p-12 text-center text-gray-400 text-sm">Loading…</div>
         ) : contacts.length === 0 ? (
           <div className="p-16 text-center">
-            <p className="text-gray-500 font-medium mb-1">No contacts found</p>
-            <p className="text-sm text-gray-400">
-              {q || statusFilter ? 'Try adjusting your search or filters.' : 'Add contacts to this list from the Contacts page.'}
+            <div className="w-14 h-14 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <UserPlus className="w-7 h-7 text-gray-400" />
+            </div>
+            <p className="text-gray-900 font-semibold mb-1">No contacts found</p>
+            <p className="text-sm text-gray-400 mb-5">
+              {q || statusFilter ? 'Try adjusting your search or filters.' : 'Add contacts to this list to start sending emails.'}
             </p>
+            {!q && !statusFilter && (
+              <button
+                onClick={() => setShowAddContacts(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+              >
+                <UserPlus className="w-4 h-4" /> Add Contacts
+              </button>
+            )}
           </div>
         ) : (
           <table className="min-w-full">
