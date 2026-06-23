@@ -2,10 +2,24 @@ import Database from 'better-sqlite3'
 import path from 'path'
 import fs from 'fs'
 
-// On Vercel (read-only filesystem) use /tmp; locally use ./data
-const DATA_DIR = process.env.VERCEL
-  ? '/tmp/mailforge-data'
-  : path.join(process.cwd(), 'data')
+// Determine data directory: honour explicit override, then detect platform
+function resolveDataDir(): string {
+  if (process.env.DATA_DIR) return process.env.DATA_DIR
+  if (process.env.VERCEL) return '/tmp/mailforge-data'
+  // Railway and other cloud platforms that may have a read-only project root
+  if (process.env.RAILWAY_PROJECT_ID || process.env.RAILWAY_ENVIRONMENT) return '/tmp/mailforge-data'
+  const local = path.join(process.cwd(), 'data')
+  try {
+    if (!fs.existsSync(local)) fs.mkdirSync(local, { recursive: true })
+    // Quick write test to confirm the path is writable
+    fs.accessSync(path.dirname(local), fs.constants.W_OK)
+    return local
+  } catch {
+    return '/tmp/mailforge-data'
+  }
+}
+
+const DATA_DIR = resolveDataDir()
 const DB_PATH = path.join(DATA_DIR, 'app.db')
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })

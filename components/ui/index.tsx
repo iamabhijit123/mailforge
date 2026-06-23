@@ -159,7 +159,7 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
   const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className={cn('relative bg-white rounded-2xl shadow-2xl w-full', sizes[size])}>
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -225,7 +225,7 @@ export function Toast({ message, type = 'info', onClose }: ToastProps) {
   }, [onClose])
   return (
     <div className={cn(
-      'fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-dropdown max-w-sm animate-in slide-in-from-bottom-2',
+      'fixed bottom-5 right-5 z-[9999] flex items-center gap-3 px-4 py-3 rounded-xl shadow-dropdown max-w-sm animate-in slide-in-from-bottom-2',
       styles[type]
     )}>
       <span className="text-sm font-medium leading-snug">{message}</span>

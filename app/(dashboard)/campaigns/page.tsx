@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
@@ -485,7 +485,7 @@ export default function CampaignsPage() {
 
       {/* Campaign Preview Modal */}
       {previewCampaign && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-[2px]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col" style={{ height: '90vh' }}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
@@ -660,3 +660,4 @@ export default function CampaignsPage() {
     </div>
   )
 }
+
