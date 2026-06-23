@@ -466,12 +466,6 @@ export default function TemplatesPage() {
 
   const CREATE_OPTIONS = [
     {
-      icon: LayoutTemplate, title: 'Start from blank',
-      desc: 'Design your email from scratch using our drag-and-drop visual editor.',
-      action: 'Build from scratch', color: 'text-blue-600', bg: 'bg-blue-50',
-      onClick: () => { setShowCreateType(false); setShowCreate(true) },
-    },
-    {
       icon: Sparkles, title: 'Generate with AI',
       desc: 'Describe your email and let Claude AI generate a beautiful design instantly.',
       action: 'Open AI Maker', color: 'text-purple-600', bg: 'bg-purple-50',

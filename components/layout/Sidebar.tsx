@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, List, Mail, FileText, Zap,
-  BarChart2, Settings, LogOut, Send, ChevronDown, Plus,
+  BarChart2, Settings, LogOut, Send, ChevronDown,
   Sparkles, Plug, RotateCcw,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -122,16 +122,6 @@ export function Sidebar() {
           </div>
           <span className="font-bold text-gray-900 tracking-tight text-[15px]">MailForge</span>
         </div>
-      </div>
-
-      {/* Create button */}
-      <div className="px-3 py-3 border-b border-gray-100">
-        <Link href="/campaigns/new">
-          <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
-            <Plus className="w-4 h-4" />
-            Create
-          </button>
-        </Link>
       </div>
 
       {/* Navigation */}
