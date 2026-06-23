@@ -328,6 +328,16 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN cc_emails TEXT DEFAULT '[]'`) } catch {}
   try { db.exec(`ALTER TABLE templates ADD COLUMN folder_id TEXT`) } catch {}
 
+  // New settings columns
+  try { db.exec(`ALTER TABLE settings ADD COLUMN phone TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN timezone TEXT DEFAULT 'America/New_York'`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN signature_image_url TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN privacy_policy_url TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_show_update_profile INTEGER DEFAULT 1`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_show_unsubscribe_comment INTEGER DEFAULT 1`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_fine_print TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN phone TEXT`) } catch {}
+
   // is_workspace_owner: explicit flag to track who owns a workspace (separate from workspace_id)
   // NULL/undefined = original owner logic (backward compat), 1 = owner, 0 = member
   try { db.exec(`ALTER TABLE users ADD COLUMN is_workspace_owner INTEGER DEFAULT NULL`) } catch {}

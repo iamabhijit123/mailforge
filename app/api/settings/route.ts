@@ -20,7 +20,12 @@ export async function PUT(req: NextRequest) {
 
   const body = await req.json()
   const db = getDb()
-  const fields = ['postmark_api_key', 'postmark_message_stream', 'sender_name', 'sender_email', 'reply_to', 'company_name', 'company_address', 'website', 'logo_url', 'anthropic_api_key']
+  const fields = [
+    'postmark_api_key', 'postmark_message_stream', 'sender_name', 'sender_email', 'reply_to',
+    'company_name', 'company_address', 'website', 'logo_url', 'anthropic_api_key',
+    'phone', 'timezone', 'signature_image_url', 'privacy_policy_url',
+    'footer_show_update_profile', 'footer_show_unsubscribe_comment', 'footer_fine_print',
+  ]
   const updates = fields.filter(f => f in body).map(f => `${f} = ?`).join(', ')
   const values = fields.filter(f => f in body).map(f => body[f])
 
