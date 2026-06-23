@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Modal, Input, Toast } from '@/components/ui'
 import {
@@ -43,23 +44,41 @@ function FolderMoveMenu({
   onMove: (folderId: string | null) => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+  const btnRef = useRef<HTMLButtonElement>(null)
+
+  function toggle(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left })
+    }
+    setOpen(o => !o)
+  }
+
   useEffect(() => {
-    function h(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    if (!open) return
+    function h() { setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
-  }, [])
+  }, [open])
+
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        onClick={e => { e.stopPropagation(); setOpen(o => !o) }}
+        ref={btnRef}
+        onClick={toggle}
         className="px-4 py-1.5 bg-white/90 hover:bg-white text-gray-800 text-xs font-semibold rounded-lg transition-colors shadow flex items-center gap-1"
         title="Move to folder"
       >
         <MoveRight className="w-3 h-3" /> Move
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 w-44 bg-white rounded-xl border border-gray-200 shadow-lg z-50 py-1" onClick={e => e.stopPropagation()}>
+      {open && createPortal(
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, zIndex: 9999 }}
+          className="w-44 bg-white rounded-xl border border-gray-200 shadow-lg py-1"
+          onMouseDown={e => e.stopPropagation()}
+        >
           <button
             onClick={() => { onMove(null); setOpen(false) }}
             className={`w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 ${!currentFolderId ? 'font-semibold text-blue-600' : ''}`}
@@ -79,9 +98,10 @@ function FolderMoveMenu({
               <span className="truncate">{f.name}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
 
