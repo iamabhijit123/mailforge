@@ -21,12 +21,19 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const { name, description } = await req.json()
-  if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
-  const db = getDb()
-  const id = crypto.randomUUID()
-  db.prepare('INSERT INTO lists (id, user_id, name, description) VALUES (?, ?, ?, ?)').run(id, session.id, name.trim(), description || null)
-  return NextResponse.json(db.prepare('SELECT * FROM lists WHERE id = ?').get(id), { status: 201 })
+  try {
+    const session = await getSession()
+    if (!session) return NextResponse.json({ error: 'Not logged in — please refresh and log in again' }, { status: 401 })
+    const body = await req.json()
+    const { name, description } = body
+    if (!name) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    const db = getDb()
+    const id = crypto.randomUUID()
+    db.prepare('INSERT INTO lists (id, user_id, name, description) VALUES (?, ?, ?, ?)').run(id, session.id, name.trim(), description || null)
+    return NextResponse.json(db.prepare('SELECT * FROM lists WHERE id = ?').get(id), { status: 201 })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[POST /api/lists]', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }

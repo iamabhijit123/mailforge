@@ -86,8 +86,10 @@ export default function ListsPage() {
       setShowCreate(false); setForm({ name: '', description: '' }); load()
       setToast({ msg: 'List created', type: 'success' })
     } else {
-      const d = await res.json().catch(() => ({}))
-      setToast({ msg: d.error || 'Failed to create list — please try again', type: 'error' })
+      const text = await res.text()
+      let msg = `Error ${res.status}`
+      try { const d = JSON.parse(text); msg = d.error || msg } catch { msg = text.slice(0, 120) || msg }
+      setToast({ msg, type: 'error' })
     }
   }
 
