@@ -327,6 +327,17 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN scheduled_at TEXT`) } catch {}
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN cc_emails TEXT DEFAULT '[]'`) } catch {}
   try { db.exec(`ALTER TABLE templates ADD COLUMN folder_id TEXT`) } catch {}
+
+  // Password reset tokens
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).
