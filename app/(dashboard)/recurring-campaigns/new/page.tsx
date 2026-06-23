@@ -118,6 +118,7 @@ export default function NewRecurringCampaignPage() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
     send_time: '09:00',
     template_folder_id: '',
+    allow_weekends: false,
   })
 
   useEffect(() => {
@@ -165,6 +166,7 @@ export default function NewRecurringCampaignPage() {
           timezone: form.timezone,
           send_time: form.send_time,
           template_folder_id: form.template_folder_id,
+          allow_weekends: form.allow_weekends,
         }),
       })
       const data = await res.json()
@@ -286,9 +288,24 @@ export default function NewRecurringCampaignPage() {
                 <p className="text-xs text-gray-400 mt-1">Leave blank for ongoing</p>
               </div>
             </div>
-            <div className="bg-blue-50 rounded-xl p-4 text-sm text-blue-700 flex gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>Sends are automatically moved to the next weekday if they fall on a weekend.</span>
+            <div className="bg-blue-50 rounded-xl p-4 flex flex-col gap-3">
+              <div className="text-sm text-blue-700 flex gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>
+                  {form.allow_weekends
+                    ? 'Sends will be generated on all days including weekends.'
+                    : 'Sends that fall on a weekend are automatically moved to the next weekday.'}
+                </span>
+              </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={form.allow_weekends}
+                  onChange={e => setForm(f => ({ ...f, allow_weekends: e.target.checked }))}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                />
+                <span className="text-sm font-medium text-blue-900">Also send on weekends</span>
+              </label>
             </div>
           </div>
         )}
@@ -360,6 +377,7 @@ export default function NewRecurringCampaignPage() {
                   <span className="text-gray-400">Send time</span><span className="font-medium text-gray-900">{form.send_time} ({form.timezone})</span>
                   <span className="text-gray-400">Lists</span><span className="font-medium text-gray-900">{form.list_ids.length} selected</span>
                   <span className="text-gray-400">Folder</span><span className="font-medium text-gray-900">{folders.find(f => f.id === form.template_folder_id)?.name}</span>
+                  <span className="text-gray-400">Weekends</span><span className="font-medium text-gray-900">{form.allow_weekends ? 'Included' : 'Skipped (weekday only)'}</span>
                 </div>
               </div>
             )}

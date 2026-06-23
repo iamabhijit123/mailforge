@@ -41,9 +41,10 @@ export function generateWeekdaySchedule(
   frequency: Frequency,
   sendTime: string,
   timezone: string,
+  allowWeekends = false,
 ): ScheduledSend[] {
   const sends: ScheduledSend[] = []
-  let current = toNextWeekday(startDate)
+  let current = allowWeekends ? startDate : toNextWeekday(startDate)
 
   while (current <= endDate) {
     sends.push({
@@ -51,7 +52,8 @@ export function generateWeekdaySchedule(
       time: sendTime,
       scheduledAt: localToUTC(current, sendTime, timezone),
     })
-    current = toNextWeekday(advanceDate(current, frequency))
+    const next = advanceDate(current, frequency)
+    current = allowWeekends ? next : toNextWeekday(next)
   }
 
   return sends

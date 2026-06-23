@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const {
     name, subject, from_name, from_email, reply_to, cc_emails,
     list_ids, template_folder_id, frequency, timezone, send_time,
-    start_date, end_date, sends: manualSends,
+    start_date, end_date, allow_weekends, sends: manualSends,
   } = body
 
   if (!name || !subject || !from_email || !frequency || !start_date || !end_date) {
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
   // Use manually adjusted sends if provided, otherwise auto-generate
   const schedule = manualSends?.length
     ? manualSends as Array<{ date: string; time: string; scheduledAt: string }>
-    : generateWeekdaySchedule(start_date, end_date, frequency as Frequency, send_time || '09:00', timezone || 'UTC')
+    : generateWeekdaySchedule(start_date, end_date, frequency as Frequency, send_time || '09:00', timezone || 'UTC', !!allow_weekends)
 
   const insertSend = db.prepare(
     'INSERT INTO recurring_sends (id, recurring_campaign_id, scheduled_date, scheduled_time, scheduled_at, is_adjusted) VALUES (?, ?, ?, ?, ?, ?)'
