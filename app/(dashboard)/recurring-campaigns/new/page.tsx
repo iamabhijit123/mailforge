@@ -5,28 +5,39 @@ import { useRouter } from 'next/navigation'
 import { Toast } from '@/components/ui'
 import {
   ChevronRight, ChevronLeft, Check, RotateCcw, Users, Calendar,
-  Clock, FolderOpen, Send, AlertCircle, ArrowRight,
+  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X,
 } from 'lucide-react'
 import Link from 'next/link'
 
 interface List { id: string; name: string; contact_count: number }
 
-function NoListsBanner() {
+function NoListsModal({ onClose }: { onClose: () => void }) {
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 flex gap-4 items-start">
-      <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-      <div className="flex-1">
-        <p className="font-semibold text-amber-900 mb-1">You need a contact list first</p>
-        <p className="text-sm text-amber-700 mb-3">
-          Recurring campaigns require at least one contact list. Create a list and add contacts before setting up a schedule.
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-[2px]">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+        <button onClick={onClose} className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-7 h-7 text-amber-500" />
+        </div>
+
+        <h2 className="text-lg font-bold text-gray-900 text-center mb-2">You need a contact list first</h2>
+        <p className="text-sm text-gray-500 text-center mb-6">
+          Recurring campaigns require at least one contact list with subscribers. Set that up first, then come back to create your schedule.
         </p>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/lists" className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-colors">
-            <ArrowRight className="w-3.5 h-3.5" /> Create a Contact List
+
+        <div className="space-y-2.5">
+          <Link href="/lists" className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+            <ArrowRight className="w-4 h-4" /> Create a Contact List
           </Link>
-          <Link href="/contacts" className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 text-xs font-bold rounded-lg transition-colors">
-            <Users className="w-3.5 h-3.5" /> Add Contacts
+          <Link href="/contacts" className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm font-semibold rounded-xl transition-colors">
+            <Users className="w-4 h-4" /> Add Contacts
           </Link>
+          <button onClick={onClose} className="w-full px-4 py-2 text-sm text-gray-400 hover:text-gray-600 transition-colors">
+            Continue anyway
+          </button>
         </div>
       </div>
     </div>
@@ -98,6 +109,7 @@ export default function NewRecurringCampaignPage() {
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+  const [showNoListsModal, setShowNoListsModal] = useState(false)
 
   const [form, setForm] = useState({
     name: '', subject: '', from_name: '', from_email: '', reply_to: '', cc_emails: '',
@@ -111,8 +123,10 @@ export default function NewRecurringCampaignPage() {
   useEffect(() => {
     Promise.all([fetch('/api/lists').then(r => r.json()), fetch('/api/template-folders').then(r => r.json())])
       .then(([ls, flds]) => {
-        setLists(Array.isArray(ls) ? ls : [])
+        const listsData = Array.isArray(ls) ? ls : []
+        setLists(listsData)
         setFolders(Array.isArray(flds) ? flds : [])
+        if (listsData.length === 0) setShowNoListsModal(true)
       })
   }, [])
 
@@ -163,6 +177,7 @@ export default function NewRecurringCampaignPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
+      {showNoListsModal && <NoListsModal onClose={() => setShowNoListsModal(false)} />}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex items-center gap-3 mb-6">
@@ -214,13 +229,16 @@ export default function NewRecurringCampaignPage() {
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
               </div>
             </div>
-            {lists.length === 0 ? (
-              <NoListsBanner />
-            ) : (
-              <div className="space-y-3">
-                <EmptyListsBanner lists={lists} />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Send to Lists *</label>
+            <div className="space-y-3">
+              {lists.length > 0 && <EmptyListsBanner lists={lists} />}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1.5"><Users className="w-3.5 h-3.5" /> Send to Lists *</label>
+                {lists.length === 0 ? (
+                  <p className="text-sm text-gray-400 py-2">
+                    No lists yet.{' '}
+                    <button onClick={() => setShowNoListsModal(true)} className="text-blue-600 hover:underline font-semibold">Create one first →</button>
+                  </p>
+                ) : (
                   <div className="space-y-1.5 max-h-40 overflow-y-auto border border-gray-200 rounded-xl p-2">
                     {lists.map(l => (
                       <label key={l.id} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer border transition-colors ${form.list_ids.includes(l.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-gray-50'}`}>
@@ -230,9 +248,9 @@ export default function NewRecurringCampaignPage() {
                       </label>
                     ))}
                   </div>
-                </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 

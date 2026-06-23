@@ -82,7 +82,13 @@ export default function ListsPage() {
   async function createList() {
     if (!form.name.trim()) return
     const res = await fetch('/api/lists', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
-    if (res.ok) { setShowCreate(false); setForm({ name: '', description: '' }); load(); setToast({ msg: 'List created', type: 'success' }) }
+    if (res.ok) {
+      setShowCreate(false); setForm({ name: '', description: '' }); load()
+      setToast({ msg: 'List created', type: 'success' })
+    } else {
+      const d = await res.json().catch(() => ({}))
+      setToast({ msg: d.error || 'Failed to create list — please try again', type: 'error' })
+    }
   }
 
   async function updateList() {
