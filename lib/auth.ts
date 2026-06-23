@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
 import { NextRequest } from 'next/server'
+import { ensureUser } from './db'
 
 const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || 'fallback-secret-change-me'
@@ -46,7 +47,9 @@ export async function getSession(): Promise<SessionUser | null> {
   const cookieStore = await cookies()
   const token = cookieStore.get(COOKIE_NAME)?.value
   if (!token) return null
-  return verifyToken(token)
+  const session = await verifyToken(token)
+  if (session) ensureUser(session)
+  return session
 }
 
 export async function getSessionFromRequest(req: NextRequest): Promise<SessionUser | null> {

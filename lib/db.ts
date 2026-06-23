@@ -328,3 +328,15 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN cc_emails TEXT DEFAULT '[]'`) } catch {}
   try { db.exec(`ALTER TABLE templates ADD COLUMN folder_id TEXT`) } catch {}
 }
+
+// Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).
+// Called automatically by getSession() so no API route changes are needed.
+export function ensureUser(user: { id: string; email: string; name: string }): void {
+  try {
+    getDb().prepare(
+      `INSERT OR IGNORE INTO users (id, email, name, password_hash) VALUES (?, ?, ?, 'jwt-authenticated')`
+    ).run(user.id, user.email, user.name)
+  } catch {
+    // non-fatal — if this fails the downstream FK error will surface as before
+  }
+}
