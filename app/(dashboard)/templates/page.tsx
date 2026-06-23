@@ -108,14 +108,10 @@ function TemplateCard({
       <div className="relative h-[220px] rounded-xl overflow-hidden border-2 border-gray-200 group-hover:border-blue-400 transition-all shadow-sm">
         <TemplatePreviewThumbnail html={template.html_body} height={220} />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all flex flex-col items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-          {onSelect ? (
+          {onSelect && (
             <button onClick={() => onSelect(template)} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-lg">
               Select
             </button>
-          ) : (
-            <Link href={`/templates/${template.id}/edit`} className="block">
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-lg shadow-lg">Edit</button>
-            </Link>
           )}
           <button onClick={() => onPreview(template)} className="px-6 py-2 bg-white hover:bg-gray-100 text-gray-900 text-sm font-bold rounded-lg shadow-lg">
             Preview
@@ -182,9 +178,11 @@ function PreviewModal({
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</p>
             </div>
             <div className="p-4 flex flex-col gap-2.5 flex-1">
-              <button onClick={onEdit} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
-                <Edit2 className="w-3.5 h-3.5" /> Edit Template
-              </button>
+              <Link href={`/templates/ai-maker`} className="block">
+                <button className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors">
+                  <Sparkles className="w-3.5 h-3.5" /> Edit with AI
+                </button>
+              </Link>
               <Link href={`/campaigns/new?template_id=${template.id}`} className="block">
                 <button className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
                   <Send className="w-3.5 h-3.5 text-gray-400" /> Use in Campaign

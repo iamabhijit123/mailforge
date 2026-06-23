@@ -3,61 +3,74 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ApartmentNetwork.com — Template Maker</title>
+  <title>AI Template Maker — MailForge</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: #f0f4f8;
+      background: #F5F6F8;
       color: #1a2e4a;
       min-height: 100vh;
     }
 
-    header {
-      background: linear-gradient(135deg, #1a2e4a 0%, #2d4a6e 100%);
-      color: white;
-      padding: 14px 24px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    }
-    header .logo { font-size: 19px; font-weight: 700; letter-spacing: -0.5px; }
-    header .logo span { color: #d4a017; }
-    header .subtitle { font-size: 11px; opacity: 0.65; margin-top: 2px; }
-
-    /* MODE TABS */
+    /* MODE TABS — matches MailForge app style */
     .mode-bar {
       background: white;
-      border-bottom: 2px solid #e2e8f0;
+      border-bottom: 1px solid #E5E7EB;
       display: flex;
-      padding: 0 20px;
+      align-items: center;
+      padding: 0 16px;
       gap: 2px;
+      height: 46px;
+      flex-shrink: 0;
     }
     .mode-tab {
-      padding: 12px 18px;
+      padding: 0 14px;
+      height: 44px;
       border: none;
       background: none;
       font-size: 13px;
       font-weight: 600;
-      color: #64748b;
+      color: #6B7280;
       cursor: pointer;
-      border-bottom: 3px solid transparent;
-      margin-bottom: -2px;
+      border-bottom: 2px solid transparent;
       transition: all 0.15s;
       display: flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
     }
-    .mode-tab:hover { color: #1a2e4a; }
-    .mode-tab.active { color: #1a2e4a; border-bottom-color: #d4a017; }
+    .mode-tab:hover { color: #111827; }
+    .mode-tab.active { color: #2563EB; border-bottom-color: #2563EB; }
+
+    .collapse-btn {
+      width: 32px; height: 32px;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      background: white;
+      color: #6B7280;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      margin-right: 10px;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .collapse-btn:hover { background: #F3F4F6; color: #111827; border-color: #D1D5DB; }
 
     .app-layout {
       display: grid;
-      grid-template-columns: 360px 1fr;
-      height: calc(100vh - 106px);
+      grid-template-columns: 340px 1fr;
+      height: calc(100vh - 46px);
+      transition: grid-template-columns 0.25s ease;
+    }
+    .app-layout.sidebar-collapsed {
+      grid-template-columns: 0px 1fr;
+    }
+    .app-layout.sidebar-collapsed .controls {
+      overflow: hidden;
+      border-right: none;
     }
 
     /* LEFT PANEL */
@@ -100,11 +113,11 @@
       text-align: center;
       background: white;
     }
-    .audience-card:hover { border-color: #1a2e4a; background: #f8fafc; }
-    .audience-card.selected { border-color: #d4a017; background: #fffbeb; box-shadow: 0 0 0 1px #d4a017; }
+    .audience-card:hover { border-color: #2563EB; background: #EFF6FF; }
+    .audience-card.selected { border-color: #2563EB; background: #EFF6FF; box-shadow: 0 0 0 1px #2563EB; }
     .audience-card .icon { font-size: 22px; margin-bottom: 5px; }
     .audience-card .label { font-size: 11px; font-weight: 600; color: #1a2e4a; line-height: 1.3; }
-    .audience-card.selected .label { color: #92610b; }
+    .audience-card.selected .label { color: #1D4ED8; }
 
     /* Format & Variations toggles */
     .toggle-row { display: flex; gap: 6px; }
@@ -124,8 +137,8 @@
       justify-content: center;
       gap: 4px;
     }
-    .toggle-btn:hover { border-color: #1a2e4a; color: #1a2e4a; }
-    .toggle-btn.selected { border-color: #1a2e4a; background: #1a2e4a; color: white; }
+    .toggle-btn:hover { border-color: #2563EB; color: #2563EB; }
+    .toggle-btn.selected { border-color: #2563EB; background: #2563EB; color: white; }
 
     /* Style cards */
     .style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
@@ -140,8 +153,8 @@
       font-weight: 600;
       color: #475569;
     }
-    .style-card:hover { border-color: #1a2e4a; color: #1a2e4a; }
-    .style-card.selected { border-color: #d4a017; background: #fffbeb; color: #92610b; }
+    .style-card:hover { border-color: #2563EB; color: #2563EB; }
+    .style-card.selected { border-color: #2563EB; background: #EFF6FF; color: #1D4ED8; }
     .style-card .style-icon { font-size: 18px; margin-bottom: 3px; }
     .style-preview-btn {
       margin-top: 6px; font-size: 10px; color: #64748b;
@@ -163,7 +176,7 @@
       transition: border-color 0.2s;
       line-height: 1.5;
     }
-    .text-input:focus { outline: none; border-color: #1a2e4a; }
+    .text-input:focus { outline: none; border-color: #2563EB; }
     .text-input::placeholder { color: #94a3b8; }
     .content-area { min-height: 150px; }
 
@@ -194,7 +207,7 @@
     .generate-btn {
       width: 100%;
       padding: 13px;
-      background: linear-gradient(135deg, #d4a017, #b8860b);
+      background: #2563EB;
       color: white;
       border: none;
       border-radius: 9px;
@@ -208,8 +221,9 @@
       gap: 7px;
     }
     .generate-btn:hover:not(:disabled) {
+      background: #1D4ED8;
       transform: translateY(-1px);
-      box-shadow: 0 5px 18px rgba(212,160,23,0.4);
+      box-shadow: 0 5px 18px rgba(37,99,235,0.35);
     }
     .generate-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
     .generate-btn .spinner {
@@ -281,7 +295,7 @@
       position: relative;
     }
     .var-tab:hover { background: #f8fafc; color: #1a2e4a; }
-    .var-tab.active { background: #1a2e4a; color: white; border-color: #1a2e4a; }
+    .var-tab.active { background: #2563EB; color: white; border-color: #2563EB; }
     .var-tab.saved-dot::after {
       content: '';
       position: absolute;
@@ -326,8 +340,8 @@
     .toolbar-btn.save-btn { border-color: #22c55e; color: #16a34a; }
     .toolbar-btn.save-btn:hover { background: #f0fdf4; }
     .toolbar-btn.save-btn.saved { background: #f0fdf4; color: #15803d; }
-    .toolbar-btn.primary { background: #1a2e4a; color: white; border-color: #1a2e4a; }
-    .toolbar-btn.primary:hover { background: #2d4a6e; }
+    .toolbar-btn.primary { background: #2563EB; color: white; border-color: #2563EB; }
+    .toolbar-btn.primary:hover { background: #1D4ED8; }
 
     .preview-content { flex: 1; overflow: hidden; position: relative; }
 
@@ -401,7 +415,7 @@
       transition: background 0.12s;
     }
     .saved-item:hover { background: #f8fafc; }
-    .saved-item.active-item { background: #fffbeb; border-left: 3px solid #d4a017; }
+    .saved-item.active-item { background: #EFF6FF; border-left: 3px solid #2563EB; }
 
     .saved-item-icon { font-size: 20px; flex-shrink: 0; }
     .saved-item-info { flex: 1; min-width: 0; }
@@ -442,7 +456,7 @@
       color: #1a2e4a; margin-bottom: 16px;
       transition: border-color 0.2s;
     }
-    .dialog input:focus { outline: none; border-color: #1a2e4a; }
+    .dialog input:focus { outline: none; border-color: #2563EB; }
     .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; }
     .dialog-btn {
       padding: 9px 18px; border-radius: 7px;
@@ -452,43 +466,19 @@
     }
     .dialog-btn:hover { background: #f8fafc; }
     .dialog-btn.primary {
-      background: #1a2e4a; color: white; border-color: #1a2e4a;
+      background: #2563EB; color: white; border-color: #2563EB;
     }
-    .dialog-btn.primary:hover { background: #2d4a6e; }
+    .dialog-btn.primary:hover { background: #1D4ED8; }
   </style>
 </head>
 <body>
 
-<header>
-  <div>
-    <div class="logo">Apartment<span>Network</span>.com</div>
-    <div class="subtitle">Marketing Template Maker</div>
-  </div>
-  <div style="margin-left:auto; display:flex; gap:20px; align-items:center;">
-    <div style="text-align:right;">
-      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">This Session</div>
-      <div id="cost-session" style="font-size:14px; font-weight:700; color:#d4a017;">$0.0000</div>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">All Time</div>
-      <div id="cost-alltime" style="font-size:14px; font-weight:700; color:#d4a017;">$0.0000</div>
-    </div>
-    <div style="text-align:right; cursor:pointer;" onclick="resetAllTimeCost()" title="Reset all-time total">
-      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">Last Gen</div>
-      <div id="cost-last" style="font-size:14px; font-weight:700; color:#a0b4c8;">—</div>
-    </div>
-    <div style="text-align:right;">
-      <div style="font-size:10px; opacity:0.5; letter-spacing:1px; text-transform:uppercase;">Credits</div>
-      <a href="https://console.anthropic.com/settings/billing" target="_blank" style="font-size:12px; font-weight:700; color:#7cb8a0; text-decoration:none;" title="View billing in Anthropic Console">Check Balance →</a>
-    </div>
-  </div>
-</header>
-
 <!-- MODE TABS -->
 <div class="mode-bar">
+  <button class="collapse-btn" id="collapse-btn" onclick="toggleSidebar()" title="Toggle controls panel">☰</button>
   <button class="mode-tab active" id="tab-marketing" onclick="switchMode('marketing')">🎯 Marketing Outreach</button>
   <button class="mode-tab" id="tab-custom" onclick="switchMode('custom')">✏️ Custom Content</button>
-  <button class="mode-tab" id="tab-saved" onclick="switchMode('saved')">💾 Saved Templates <span id="saved-count" style="background:#d4a017;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;display:none">0</span></button>
+  <button class="mode-tab" id="tab-saved" onclick="switchMode('saved')">💾 Saved Templates <span id="saved-count" style="background:#2563EB;color:white;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px;display:none">0</span></button>
 </div>
 
 <div class="app-layout">
@@ -716,40 +706,15 @@
 </div>
 
 <script>
-  // ── Cost Tracking (Sonnet 4.6 pricing) ──
-  const COST_INPUT_PER_M  = 3.00;  // $3.00 per 1M input tokens
-  const COST_OUTPUT_PER_M = 15.00; // $15.00 per 1M output tokens
-  let sessionCost = 0;
-
-  function calcCost(usage) {
-    if (!usage) return 0;
-    const input  = (usage.input_tokens  || 0) / 1_000_000 * COST_INPUT_PER_M;
-    const output = (usage.output_tokens || 0) / 1_000_000 * COST_OUTPUT_PER_M;
-    return input + output;
-  }
-
-  function trackCost(usage) {
-    const cost = calcCost(usage);
-    sessionCost += cost;
-
-    // All-time from localStorage
-    const allTime = parseFloat(localStorage.getItem('aptnetwork_cost_alltime') || '0') + cost;
-    localStorage.setItem('aptnetwork_cost_alltime', allTime.toFixed(6));
-
-    document.getElementById('cost-last').textContent    = '$' + cost.toFixed(4);
-    document.getElementById('cost-session').textContent = '$' + sessionCost.toFixed(4);
-    document.getElementById('cost-alltime').textContent = '$' + allTime.toFixed(4);
-  }
-
-  function resetAllTimeCost() {
-    if (!confirm('Reset all-time cost total to $0?')) return;
-    localStorage.setItem('aptnetwork_cost_alltime', '0');
-    document.getElementById('cost-alltime').textContent = '$0.0000';
-  }
-
-  function initCostDisplay() {
-    const allTime = parseFloat(localStorage.getItem('aptnetwork_cost_alltime') || '0');
-    document.getElementById('cost-alltime').textContent = '$' + allTime.toFixed(4);
+  // ── Sidebar collapse ──
+  let sidebarCollapsed = false;
+  function toggleSidebar() {
+    sidebarCollapsed = !sidebarCollapsed;
+    const layout = document.querySelector('.app-layout');
+    const btn = document.getElementById('collapse-btn');
+    layout.classList.toggle('sidebar-collapsed', sidebarCollapsed);
+    btn.textContent = sidebarCollapsed ? '▶' : '☰';
+    btn.title = sidebarCollapsed ? 'Show controls' : 'Hide controls';
   }
 
   // ── State ──
@@ -958,9 +923,6 @@
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Server error');
-
-      // Track cost
-      if (data.usage) trackCost(data.usage);
 
       // Store variations from single response
       variations = (data.variations || [data.html]).map((html, i) => ({
@@ -1548,7 +1510,6 @@
 
   // Init
   updateSavedCount();
-  initCostDisplay();
 </script>
 </body>
 </html>
