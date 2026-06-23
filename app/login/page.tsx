@@ -117,6 +117,10 @@ export default function LoginPage() {
               Don&apos;t have an account?{' '}
               <Link href="/register" className="text-blue-600 font-semibold hover:underline">Register free</Link>
             </p>
+            <p className="mt-2 text-center text-xs text-gray-400">
+              Account not working after a server restart?{' '}
+              <Link href="/register" className="text-blue-500 hover:underline">Re-register</Link>{' '}to restore access.
+            </p>
           </div>
         </div>
       </div>

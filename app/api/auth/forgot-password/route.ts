@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const origin = req.headers.get('origin') || req.nextUrl.origin
     const resetUrl = `${origin}/reset-password/${token}`
 
-    const fromEmail = settings?.sender_email || process.env.POSTMARK_FROM_EMAIL || 'noreply@aptnetwork.com'
+    const fromEmail = settings?.sender_email || process.env.POSTMARK_FROM_EMAIL || 'flyers@aptnetwork.com'
     const fromName = settings?.sender_name || process.env.POSTMARK_FROM_NAME || 'MailForge'
 
     await sendEmail({
@@ -50,7 +50,6 @@ export async function POST(req: NextRequest) {
       from: `${fromName} <${fromEmail}>`,
       to: user.email,
       subject: 'Reset your MailForge password',
-      messageStream: 'outbound',
       htmlBody: `
         <div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
           <div style="margin-bottom:24px;">
