@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Settings, LogOut, User, HelpCircle, Sparkles } from 'lucide-react'
+import { ChevronDown, Settings, LogOut, HelpCircle, Sparkles, UserCircle } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
@@ -68,6 +68,14 @@ export function Header({ user }: HeaderProps) {
 
             {/* Actions */}
             <div className="py-1.5">
+              <Link
+                href="/settings"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                <UserCircle className="w-4 h-4 text-gray-400" />
+                Complete profile
+              </Link>
               <Link
                 href="/settings"
                 onClick={() => setOpen(false)}

@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const hash = await bcrypt.hash(password, 12)
   const isFirst = (db.prepare('SELECT COUNT(*) as c FROM users').get() as { c: number }).c === 0
 
-  db.prepare('INSERT INTO users (id, email, name, password_hash, role) VALUES (?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO users (id, email, name, password_hash, role, is_workspace_owner) VALUES (?, ?, ?, ?, ?, 1)').run(
     id, email.toLowerCase().trim(), name.trim(), hash, isFirst ? 'admin' : 'member'
   )
   db.prepare('INSERT INTO settings (user_id) VALUES (?)').run(id)

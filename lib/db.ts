@@ -328,6 +328,13 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE campaigns ADD COLUMN cc_emails TEXT DEFAULT '[]'`) } catch {}
   try { db.exec(`ALTER TABLE templates ADD COLUMN folder_id TEXT`) } catch {}
 
+  // is_workspace_owner: explicit flag to track who owns a workspace (separate from workspace_id)
+  // NULL/undefined = original owner logic (backward compat), 1 = owner, 0 = member
+  try { db.exec(`ALTER TABLE users ADD COLUMN is_workspace_owner INTEGER DEFAULT NULL`) } catch {}
+  // Backfill: existing users with workspace_id=NULL are owners, others are members
+  try { db.exec(`UPDATE users SET is_workspace_owner = 1 WHERE workspace_id IS NULL AND is_workspace_owner IS NULL`) } catch {}
+  try { db.exec(`UPDATE users SET is_workspace_owner = 0 WHERE workspace_id IS NOT NULL AND is_workspace_owner IS NULL`) } catch {}
+
   // Password reset tokens
   try { db.exec(`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (

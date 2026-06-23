@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Toast } from '@/components/ui'
-import { Save, Eye, EyeOff, Copy, Check, UserPlus, Trash2, Shield, User, MoreHorizontal, Mail, ExternalLink } from 'lucide-react'
+import { Save, Eye, EyeOff, Copy, Check, UserPlus, Trash2, Shield, User, Mail, ExternalLink, ArrowRightLeft } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Settings {
@@ -169,7 +169,7 @@ function AccountDetailsTab({ settings, me, onSave }: { settings: Settings; me: M
 }
 
 // ─── Tab: Team members ────────────────────────────────────────────────────────
-function TeamMembersTab({ me }: { me: MeUser }) {
+function TeamMembersTab({ me, onOwnershipTransferred }: { me: MeUser; onOwnershipTransferred: () => void }) {
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [showInvite, setShowInvite] = useState(false)
@@ -177,6 +177,7 @@ function TeamMembersTab({ me }: { me: MeUser }) {
   const [inviting, setInviting] = useState(false)
   const [inviteLink, setInviteLink] = useState('')
   const [copied, setCopied] = useState(false)
+  const [transferring, setTransferring] = useState<string | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   async function load() {
@@ -207,6 +208,24 @@ function TeamMembersTab({ me }: { me: MeUser }) {
     if (!confirm(`Remove ${email} from your account?`)) return
     const res = await fetch(`/api/team/${id}`, { method: 'DELETE' })
     if (res.ok) { setToast({ msg: 'Team member removed', type: 'success' }); load() }
+  }
+
+  async function transferOwnership(memberId: string, memberEmail: string) {
+    if (!confirm(`Transfer account ownership to ${memberEmail}?\n\nThis will make them the account owner. You will become a regular team member.`)) return
+    setTransferring(memberId)
+    const res = await fetch('/api/team/transfer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId }),
+    })
+    setTransferring(null)
+    if (res.ok) {
+      setToast({ msg: `Ownership transferred to ${memberEmail}`, type: 'success' })
+      setTimeout(() => onOwnershipTransferred(), 1500)
+    } else {
+      const d = await res.json()
+      setToast({ msg: d.error || 'Transfer failed', type: 'error' })
+    }
   }
 
   function copyLink() {
@@ -313,7 +332,7 @@ function TeamMembersTab({ me }: { me: MeUser }) {
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
-              {['Member', 'Role', 'Status', 'Invited', ''].map(h => (
+              {['Member', 'Role', 'Status', 'Invited', 'Actions'].map(h => (
                 <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
               ))}
             </tr>
@@ -378,9 +397,22 @@ function TeamMembersTab({ me }: { me: MeUser }) {
                 </td>
                 <td className="px-5 py-3 text-xs text-gray-500">{new Date(m.invited_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 <td className="px-5 py-3">
-                  <button onClick={() => removeMember(m.id, m.email)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    {m.status === 'active' && (
+                      <button
+                        onClick={() => transferOwnership(m.id, m.email)}
+                        disabled={transferring === m.id}
+                        title="Transfer ownership to this member"
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <ArrowRightLeft className="w-3.5 h-3.5" />
+                        {transferring === m.id ? '…' : 'Make owner'}
+                      </button>
+                    )}
+                    <button onClick={() => removeMember(m.id, m.email)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -568,7 +600,7 @@ export default function SettingsPage() {
 
       {/* Tab content */}
       {tab === 'account' && <AccountDetailsTab settings={settings} me={me} onSave={saveSettings} />}
-      {tab === 'team' && <TeamMembersTab me={me} />}
+      {tab === 'team' && <TeamMembersTab me={me} onOwnershipTransferred={() => { window.location.reload() }} />}
       {tab === 'developer' && <DeveloperTab settings={settings} me={me} onSave={saveSettings} />}
     </div>
   )

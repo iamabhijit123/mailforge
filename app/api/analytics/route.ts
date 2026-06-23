@@ -54,8 +54,6 @@ export async function GET() {
       ORDER BY date ASC
     `).all(session.id)
 
-    const userRow = db.prepare('SELECT name, email FROM users WHERE id = ?').get(session.id) as { name: string; email: string } | undefined
-
     return NextResponse.json({
       totalContacts,
       totalCampaigns,
@@ -64,7 +62,7 @@ export async function GET() {
       recentCampaigns,
       contactGrowth,
       opensByDay,
-      userName: userRow?.name || userRow?.email?.split('@')[0] || '',
+      userName: session.name || session.email?.split('@')[0] || '',
     })
   } catch (err) {
     console.error('[analytics GET]', err)

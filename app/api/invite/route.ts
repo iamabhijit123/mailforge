@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
   // Create new user with workspace_id pointing to owner
   const userId = crypto.randomUUID()
   const hash = await bcrypt.hash(password, 12)
-  db.prepare('INSERT INTO users (id, email, name, password_hash, role, workspace_id) VALUES (?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO users (id, email, name, password_hash, role, workspace_id, is_workspace_owner) VALUES (?, ?, ?, ?, ?, ?, 0)').run(
     userId, invite.email.toLowerCase(), name.trim(), hash, invite.role, invite.owner_user_id
   )
   // No settings row needed — member inherits owner's settings via workspace_id

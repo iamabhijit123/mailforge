@@ -185,21 +185,13 @@ export default function DashboardPage() {
           </h1>
           <p className="text-gray-500 text-sm mt-1">Here's what's happening with your email marketing.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-all"
-            title="Refresh"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <Link
-            href="/settings"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-card"
-          >
-            Complete profile
-          </Link>
-        </div>
+        <button
+          onClick={load}
+          className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-all"
+          title="Refresh"
+        >
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {error && (
