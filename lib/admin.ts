@@ -15,6 +15,9 @@ export function getAdminSettings() {
   for (const r of rows) s[r.key] = r.value
   return {
     postmark_api_key: s.postmark_api_key || process.env.POSTMARK_API_KEY || '',
+    // Account API token — needed for domain management (POST/DELETE /domains, verifyDkim)
+    // Different from the Server token used for sending; get it from Postmark → My Account → API Tokens
+    postmark_account_api_key: s.postmark_account_api_key || process.env.POSTMARK_ACCOUNT_API_KEY || '',
     anthropic_api_key: s.anthropic_api_key || process.env.ANTHROPIC_API_KEY || '',
     postmark_message_stream: s.postmark_message_stream || 'broadcast',
     default_sender_name: s.default_sender_name || '',

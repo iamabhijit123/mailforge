@@ -13,12 +13,12 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!record) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Remove from Postmark (non-fatal if it fails)
-  const { postmark_api_key } = getAdminSettings()
-  if (postmark_api_key && record.postmark_domain_id) {
+  const { postmark_account_api_key } = getAdminSettings()
+  if (postmark_account_api_key && record.postmark_domain_id) {
     try {
       await fetch(`https://api.postmarkapp.com/domains/${record.postmark_domain_id}`, {
         method: 'DELETE',
-        headers: { 'X-Postmark-Server-Token': postmark_api_key },
+        headers: { 'X-Postmark-Account-Token': postmark_account_api_key },
       })
     } catch { /* non-fatal */ }
   }

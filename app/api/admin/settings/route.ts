@@ -12,7 +12,7 @@ export async function PUT(req: NextRequest) {
   const session = await getSession()
   if (!session || !isAdmin(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   const body = await req.json()
-  const allowed = ['postmark_api_key', 'anthropic_api_key', 'postmark_message_stream', 'default_sender_name', 'default_sender_email']
+  const allowed = ['postmark_api_key', 'postmark_account_api_key', 'anthropic_api_key', 'postmark_message_stream', 'default_sender_name', 'default_sender_email']
   for (const key of allowed) {
     if (key in body) setAdminSetting(key, String(body[key] ?? ''))
   }

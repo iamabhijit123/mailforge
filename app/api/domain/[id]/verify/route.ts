@@ -12,11 +12,11 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const record = db.prepare('SELECT * FROM domain_verifications WHERE id = ? AND user_id = ?').get(id, session.id) as Record<string, unknown> | undefined
   if (!record) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
 
-  const { postmark_api_key } = getAdminSettings()
-  if (!postmark_api_key) return NextResponse.json({ error: 'Postmark not configured' }, { status: 400 })
+  const { postmark_account_api_key } = getAdminSettings()
+  if (!postmark_account_api_key) return NextResponse.json({ error: 'Postmark Account API token not configured' }, { status: 400 })
 
   const pmId = record.postmark_domain_id as string
-  const headers = { Accept: 'application/json', 'X-Postmark-Server-Token': postmark_api_key }
+  const headers = { Accept: 'application/json', 'X-Postmark-Account-Token': postmark_account_api_key }
 
   try {
     // Trigger DKIM verification

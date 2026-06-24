@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!cleanDomain || !cleanDomain.includes('.')) return NextResponse.json({ error: 'Enter a valid domain (e.g. example.com)' }, { status: 400 })
 
   const adminSettings = getAdminSettings()
-  if (!adminSettings.postmark_api_key) return NextResponse.json({ error: 'Postmark API key not configured. Ask the admin to add it under Admin → Settings.' }, { status: 400 })
+  if (!adminSettings.postmark_account_api_key) return NextResponse.json({ error: 'Postmark Account API token not configured. Ask the admin to add it under Admin → Settings → Postmark Account API Token.' }, { status: 400 })
 
   const db = getDb()
   const existing = db.prepare('SELECT * FROM domain_verifications WHERE domain = ?').get(cleanDomain) as Record<string, unknown> | undefined
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-Postmark-Server-Token': adminSettings.postmark_api_key,
+        'X-Postmark-Account-Token': adminSettings.postmark_account_api_key,
       },
       body: JSON.stringify({ Name: cleanDomain }),
     })

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { Eye, EyeOff, Save, CheckCircle, AlertCircle } from 'lucide-react'
 
 interface AdminSettings {
-  postmark_api_key: string; postmark_message_stream: string
+  postmark_api_key: string; postmark_account_api_key: string; postmark_message_stream: string
   default_sender_name: string; default_sender_email: string; anthropic_api_key: string
 }
 
@@ -31,7 +31,7 @@ function SecretInput({ label, value, onChange, placeholder, hint }: {
 
 export default function AdminSettingsPage() {
   const [form, setForm] = useState<AdminSettings>({
-    postmark_api_key: '', postmark_message_stream: 'broadcast',
+    postmark_api_key: '', postmark_account_api_key: '', postmark_message_stream: 'broadcast',
     default_sender_name: '', default_sender_email: '', anthropic_api_key: '',
   })
   const [loading, setLoading] = useState(true)
@@ -80,14 +80,27 @@ export default function AdminSettingsPage() {
       {/* Postmark */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
         <h2 className="font-semibold text-gray-900">Postmark (Email delivery)</h2>
-        <p className="text-sm text-gray-500 -mt-2">All emails sent by all accounts use this Postmark server token.</p>
-        <SecretInput
-          label="Server API Token"
-          value={form.postmark_api_key}
-          onChange={set('postmark_api_key')}
-          placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-          hint="Found in Postmark → Servers → Your Server → API Tokens"
-        />
+        <p className="text-sm text-gray-500 -mt-2">Postmark uses two separate API tokens — one for sending emails, one for managing domains.</p>
+
+        <div className="grid grid-cols-1 gap-4">
+          <SecretInput
+            label="Server API Token — for sending emails"
+            value={form.postmark_api_key}
+            onChange={set('postmark_api_key')}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            hint="Postmark → Servers → Your Server → Settings → API Tokens"
+          />
+          <SecretInput
+            label="Account API Token — for domain authentication"
+            value={form.postmark_account_api_key}
+            onChange={set('postmark_account_api_key')}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            hint="Postmark → My Account (top-right avatar) → Account API Tokens"
+          />
+        </div>
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+          <strong>Why two tokens?</strong> The Server token sends emails. The Account token manages domain authentication (DKIM/SPF) — it&apos;s scoped to your whole Postmark account, not one server. Both are required.
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1.5">Message stream</label>
           <select
