@@ -1,3 +1,4 @@
+// Admin quick-login — credentials validated against ADMIN_EMAIL + ADMIN_PASSWORD env vars
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { signToken, COOKIE_NAME } from '@/lib/auth'
