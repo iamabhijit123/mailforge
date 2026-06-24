@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Users, List, Mail, FileText, Zap,
+  LayoutDashboard, Users, Mail, FileText, Zap,
   BarChart2, Settings, LogOut, Send, ChevronDown,
-  Sparkles, Plug, RotateCcw,
+  Sparkles, Plug, RotateCcw, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -44,11 +44,26 @@ const nav: NavItem[] = [
   { href: '/integrations', label: 'Integrations', icon: Plug },
 ]
 
-function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: string; collapsed: boolean }) {
   const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-  const hasChildren = item.children && item.children.length > 0
+  const hasChildren = !collapsed && item.children && item.children.length > 0
   const [open, setOpen] = useState(isActive)
   const Icon = item.icon
+
+  if (collapsed) {
+    return (
+      <Link
+        href={item.href}
+        title={item.label}
+        className={cn(
+          'flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-all duration-150',
+          isActive ? 'text-blue-700 bg-blue-50' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'
+        )}
+      >
+        <Icon className={cn('w-5 h-5', isActive ? 'text-blue-600' : '')} />
+      </Link>
+    )
+  }
 
   if (hasChildren) {
     return (
@@ -57,9 +72,7 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
           onClick={() => setOpen(o => !o)}
           className={cn(
             'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
-            isActive
-              ? 'text-blue-700 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+            isActive ? 'text-blue-700 bg-blue-50' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
           )}
         >
           <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-blue-600' : 'text-gray-400')} />
@@ -92,11 +105,10 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   return (
     <Link
       href={item.href}
+      title={collapsed ? item.label : undefined}
       className={cn(
         'flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
-        isActive
-          ? 'text-blue-700 bg-blue-50'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        isActive ? 'text-blue-700 bg-blue-50' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       )}
     >
       <Icon className={cn('w-4 h-4 flex-shrink-0', isActive ? 'text-blue-600' : 'text-gray-400')} />
@@ -105,64 +117,110 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
   )
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  collapsed: boolean
+  onToggle: () => void
+}
+
+export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname()
+  const w = collapsed ? 'w-14' : 'w-56'
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-40 w-56 bg-white flex flex-col"
+      className={cn('fixed inset-y-0 left-0 z-40 bg-white flex flex-col transition-[width] duration-200', w)}
       style={{ boxShadow: '1px 0 0 0 #E5E7EB' }}
     >
-      {/* Logo */}
-      <div className="h-14 flex items-center px-4 border-b border-gray-100">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+      {/* Logo + collapse toggle */}
+      <div className="h-14 flex items-center border-b border-gray-100 flex-shrink-0 px-3 gap-2">
+        {!collapsed && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)' }}>
+              <Mail className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-bold text-gray-900 tracking-tight text-[15px] truncate">MailForge</span>
+          </div>
+        )}
+        {collapsed && (
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center mx-auto flex-shrink-0"
             style={{ background: 'linear-gradient(135deg, #FF6B35 0%, #F7931E 100%)' }}>
             <Mail className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-gray-900 tracking-tight text-[15px]">MailForge</span>
-        </div>
+        )}
+        <button
+          onClick={onToggle}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={cn(
+            'flex-shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors',
+            collapsed && 'hidden'
+          )}
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
       </div>
 
+      {/* Expand button when collapsed */}
+      {collapsed && (
+        <button
+          onClick={onToggle}
+          title="Expand sidebar"
+          className="mx-auto mt-2 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        >
+          <PanelLeftOpen className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
+      <nav className={cn('flex-1 overflow-y-auto py-3 space-y-0.5', collapsed ? 'px-1' : 'px-2')}>
         {nav.map(item => (
-          <NavLink key={item.href} item={item} pathname={pathname} />
+          <NavLink key={item.href} item={item} pathname={pathname} collapsed={collapsed} />
         ))}
       </nav>
 
       {/* Bottom section */}
-      <div className="border-t border-gray-100 py-2 px-2 space-y-0.5">
-        <Link
-          href="/templates/ai-maker"
-          className={cn(
-            'flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
-            pathname === '/templates/ai-maker'
-              ? 'text-blue-700 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-          )}
-        >
-          <Sparkles className={cn('w-4 h-4 flex-shrink-0', pathname === '/templates/ai-maker' ? 'text-blue-600' : 'text-gray-400')} />
-          AI Template Maker
-        </Link>
-        <Link
-          href="/settings"
-          className={cn(
-            'flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
-            pathname === '/settings'
-              ? 'text-blue-700 bg-blue-50'
-              : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-          )}
-        >
-          <Settings className={cn('w-4 h-4 flex-shrink-0', pathname === '/settings' ? 'text-blue-600' : 'text-gray-400')} />
-          Settings
-        </Link>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-gray-600 hover:bg-gray-100 hover:text-gray-900">
-            <LogOut className="w-4 h-4 flex-shrink-0 text-gray-400" />
-            Log out
-          </button>
-        </form>
+      <div className={cn('border-t border-gray-100 py-2 space-y-0.5', collapsed ? 'px-1' : 'px-2')}>
+        {collapsed ? (
+          <>
+            <Link href="/templates/ai-maker" title="AI Template Maker"
+              className={cn('flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
+                pathname === '/templates/ai-maker' ? 'text-blue-700 bg-blue-50' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900')}>
+              <Sparkles className="w-5 h-5" />
+            </Link>
+            <Link href="/settings" title="Settings"
+              className={cn('flex items-center justify-center w-10 h-10 mx-auto rounded-lg transition-colors',
+                pathname === '/settings' ? 'text-blue-700 bg-blue-50' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900')}>
+              <Settings className="w-5 h-5" />
+            </Link>
+            <form action="/api/auth/logout" method="POST" className="flex justify-center">
+              <button type="submit" title="Log out"
+                className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors text-gray-500 hover:bg-gray-100 hover:text-gray-900">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <Link href="/templates/ai-maker"
+              className={cn('flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
+                pathname === '/templates/ai-maker' ? 'text-blue-700 bg-blue-50' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')}>
+              <Sparkles className={cn('w-4 h-4 flex-shrink-0', pathname === '/templates/ai-maker' ? 'text-blue-600' : 'text-gray-400')} />
+              AI Template Maker
+            </Link>
+            <Link href="/settings"
+              className={cn('flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150',
+                pathname === '/settings' ? 'text-blue-700 bg-blue-50' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900')}>
+              <Settings className={cn('w-4 h-4 flex-shrink-0', pathname === '/settings' ? 'text-blue-600' : 'text-gray-400')} />
+              Settings
+            </Link>
+            <form action="/api/auth/logout" method="POST">
+              <button type="submit" className="w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-150 text-gray-600 hover:bg-gray-100 hover:text-gray-900">
+                <LogOut className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                Log out
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </aside>
   )

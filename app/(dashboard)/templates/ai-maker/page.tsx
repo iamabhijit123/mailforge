@@ -15,9 +15,9 @@ export default function AiTemplateMakerPage() {
   }, [])
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] -m-6">
+    <div className="flex flex-col h-full">
       {hasKey === false && (
-        <div className="mx-6 mt-4 mb-0 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3 flex-shrink-0">
+        <div className="mx-4 mt-3 mb-0 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3 flex-shrink-0">
           <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <p className="text-sm text-amber-800">
             Anthropic API key not configured.{' '}
