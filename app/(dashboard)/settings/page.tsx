@@ -399,40 +399,113 @@ function AccountDetailsTab({ settings, me, onSaveSettings, onSaveMe, toast }: {
 }
 
 // ─── Tab: Account emails ──────────────────────────────────────────────────────
-function AccountEmailsTab({ settings, me }: { settings: Settings; me: MeUser }) {
-  const senderEmail = settings.sender_email || ''
-  const domain = senderEmail ? senderEmail.split('@')[1] || '' : ''
+function AccountEmailsTab({ settings, me, onTabChange }: { settings: Settings; me: MeUser; onTabChange: (t: string) => void }) {
+  const [domains, setDomains] = useState<DomainVerification[]>([])
 
-  const emailEntries = senderEmail ? [{ email: senderEmail, isDefault: true }] : []
+  useEffect(() => {
+    fetch('/api/domain').then(r => r.json()).then(d => setDomains(d.domains || []))
+  }, [])
+
+  const senderEmail = settings.sender_email || ''
+  const senderDomain = senderEmail ? senderEmail.split('@')[1] || '' : ''
+
+  const verifiedDomain = senderDomain
+    ? domains.find(d => d.domain === senderDomain && d.status === 'verified')
+    : null
+  const pendingDomain = senderDomain && !verifiedDomain
+    ? domains.find(d => d.domain === senderDomain && d.status === 'pending')
+    : null
+
+  // What email will campaigns actually be sent from?
+  const willUseSenderEmail = !!verifiedDomain
 
   return (
     <div className="space-y-6">
+      {/* Actual sending behaviour banner */}
+      {senderEmail ? (
+        <div className={`rounded-2xl border p-4 text-sm flex items-start gap-3 ${willUseSenderEmail ? 'bg-green-50 border-green-200 text-green-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+          {willUseSenderEmail
+            ? <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+            : <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />}
+          <div>
+            <p className="font-semibold mb-0.5">
+              {willUseSenderEmail
+                ? `Campaigns will be sent From: ${senderEmail}`
+                : `Campaigns will use the platform default sender`}
+            </p>
+            <p className="text-xs opacity-80">
+              {willUseSenderEmail
+                ? `${senderDomain} is authenticated — recipients see your brand in the From field.`
+                : pendingDomain
+                  ? `${senderDomain} is added but DNS records not verified yet. Until verified, your email appears in Reply-To only.`
+                  : `${senderDomain} has not been authenticated yet. Verify it under the Domain verification tab to send from your own address.`}
+            </p>
+            {!willUseSenderEmail && (
+              <button onClick={() => onTabChange('domains')} className="mt-1.5 text-xs font-semibold underline underline-offset-2">
+                Go to Domain verification →
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold mb-0.5">No sender email configured</p>
+            <p className="text-xs opacity-80">Campaigns cannot be sent until you add a sender email. Go to Account details → Email settings.</p>
+          </div>
+        </div>
+      )}
+
       {/* Domains */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold text-gray-900">Domains</h3>
-          <p className="text-sm text-gray-500 mt-0.5">Emails must be sent with authenticated sender domains.</p>
+          <p className="text-sm text-gray-500 mt-0.5">Only authenticated domains can be used as the From address.</p>
         </div>
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Domain name</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Domain</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Authentication</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Campaigns use this?</th>
             </tr>
           </thead>
           <tbody>
-            {domain ? (
+            {domains.length > 0 ? domains.map(dv => {
+              const isActive = senderDomain === dv.domain
+              return (
+                <tr key={dv.id} className={`border-t border-gray-100 ${isActive ? 'bg-blue-50/40' : ''}`}>
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                    {dv.domain} {isActive && <span className="text-xs text-blue-600 font-normal ml-1">(sender domain)</span>}
+                  </td>
+                  <td className="px-6 py-4">
+                    {dv.status === 'verified'
+                      ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold"><CheckCircle className="w-3 h-3" /> Authenticated</span>
+                      : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold"><AlertCircle className="w-3 h-3" /> Pending DNS</span>}
+                  </td>
+                  <td className="px-6 py-4">
+                    {isActive && dv.status === 'verified'
+                      ? <span className="text-xs font-semibold text-green-700">✓ Yes — From: {senderEmail}</span>
+                      : isActive
+                        ? <span className="text-xs text-amber-700">Not yet — verify to enable</span>
+                        : <span className="text-xs text-gray-400">—</span>}
+                  </td>
+                </tr>
+              )
+            }) : senderDomain ? (
               <tr className="border-t border-gray-100">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{domain}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{senderDomain}</td>
                 <td className="px-6 py-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                    <CheckCircle className="w-3 h-3" /> Configured
-                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gray-100 text-gray-500 text-xs font-semibold"><AlertCircle className="w-3 h-3" /> Not added</span>
+                </td>
+                <td className="px-6 py-4 text-xs text-gray-400">
+                  <button onClick={() => onTabChange('domains')} className="text-blue-600 hover:underline font-medium">Add & verify →</button>
                 </td>
               </tr>
             ) : (
               <tr className="border-t border-gray-100">
-                <td colSpan={2} className="px-6 py-6 text-center text-sm text-gray-400">
+                <td colSpan={3} className="px-6 py-6 text-center text-sm text-gray-400">
                   No sender email configured. Add one in Account details → Email settings.
                 </td>
               </tr>
@@ -446,40 +519,42 @@ function AccountEmailsTab({ settings, me }: { settings: Settings; me: MeUser }) 
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <h3 className="font-semibold text-gray-900">Email addresses</h3>
-            <p className="text-sm text-gray-500 mt-0.5">All email addresses linked to your account.</p>
+            <p className="text-sm text-gray-500 mt-0.5">Configured sender addresses for your account.</p>
           </div>
           {me.isOwner && (
-            <a href="/settings" className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
-              <AtSign className="w-3.5 h-3.5" /> Add sender email
-            </a>
+            <button onClick={() => onTabChange('account')} className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+              <AtSign className="w-3.5 h-3.5" /> Edit sender email
+            </button>
           )}
         </div>
         <table className="min-w-full">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Campaigns will send from</th>
             </tr>
           </thead>
           <tbody>
-            {emailEntries.length > 0 ? emailEntries.map(entry => (
-              <tr key={entry.email} className="border-t border-gray-100">
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">{entry.email}</td>
+            {senderEmail ? (
+              <tr className="border-t border-gray-100">
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">{senderEmail}</td>
                 <td className="px-6 py-4">
                   <div className="flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                      <CheckCircle className="w-3 h-3" /> Configured
-                    </span>
-                    {entry.isDefault && (
-                      <>
-                        <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Default from</span>
-                        <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Default Reply to</span>
-                      </>
+                    {willUseSenderEmail ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                        <CheckCircle className="w-3 h-3" /> This address (domain verified)
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                        <AlertCircle className="w-3 h-3" /> Platform default sender (domain not verified)
+                      </span>
                     )}
+                    <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Default from</span>
+                    <span className="px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">Reply-To</span>
                   </div>
                 </td>
               </tr>
-            )) : (
+            ) : (
               <tr className="border-t border-gray-100">
                 <td colSpan={2} className="px-6 py-6 text-center">
                   <AlertCircle className="w-8 h-8 text-gray-200 mx-auto mb-2" />
@@ -490,10 +565,6 @@ function AccountEmailsTab({ settings, me }: { settings: Settings; me: MeUser }) 
             )}
           </tbody>
         </table>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800">
-        <strong>Domain authentication:</strong> For best deliverability, verify your sending domain in Postmark. Set up SPF, DKIM, and DMARC records in your DNS provider. Your Postmark webhook URL is available under Developer settings.
       </div>
     </div>
   )
@@ -1100,7 +1171,7 @@ export default function SettingsPage() {
       </div>
 
       {tab === 'account' && <AccountDetailsTab settings={settings} me={me} onSaveSettings={saveSettings} onSaveMe={saveMe} toast={showToast} />}
-      {tab === 'emails' && <AccountEmailsTab settings={settings} me={me} />}
+      {tab === 'emails' && <AccountEmailsTab settings={settings} me={me} onTabChange={t => setTab(t as TabId)} />}
       {tab === 'domains' && <DomainsTab me={me} />}
       {tab === 'team' && <TeamMembersTab me={me} onOwnershipTransferred={() => window.location.reload()} />}
       {tab === 'developer' && <DeveloperTab me={me} />}

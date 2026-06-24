@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Toast } from '@/components/ui'
 import {
   ChevronRight, ChevronLeft, Check, RotateCcw, Users, Calendar,
-  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X,
+  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 
 interface List { id: string; name: string; contact_count: number }
+interface AccountSettings { sender_name?: string; sender_email?: string; reply_to?: string; timezone?: string; company_address?: string }
 
 function NoListsModal({ onClose }: { onClose: () => void }) {
   return (
@@ -102,14 +103,47 @@ function StepIndicator({ current }: { current: number }) {
   )
 }
 
+function IncompleteSettingsModal({ missing, onClose }: { missing: string[]; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-7 h-7 text-amber-500" />
+        </div>
+        <h2 className="text-lg font-bold text-gray-900 text-center mb-2">Complete your account setup first</h2>
+        <p className="text-sm text-gray-500 text-center mb-5">Fill in these settings before creating campaigns.</p>
+        <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 mb-5 space-y-2">
+          {missing.map(m => (
+            <div key={m} className="flex items-center gap-2 text-sm text-red-700">
+              <span className="w-4 h-4 rounded-full border-2 border-red-300 flex-shrink-0" />
+              {m}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-3">
+          <Link href="/settings" className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+            <Settings className="w-4 h-4" /> Go to Settings
+          </Link>
+          <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors">
+            Continue anyway
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function NewRecurringCampaignPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
   const [lists, setLists] = useState<List[]>([])
   const [folders, setFolders] = useState<FolderItem[]>([])
+  const [accountSettings, setAccountSettings] = useState<AccountSettings>({})
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [showNoListsModal, setShowNoListsModal] = useState(false)
+  const [incompleteModal, setIncompleteModal] = useState<string[] | null>(null)
+  const [showFromEdit, setShowFromEdit] = useState(false)
 
   const [form, setForm] = useState({
     name: '', subject: '', from_name: '', from_email: '', reply_to: '', cc_emails: '',
@@ -122,13 +156,31 @@ export default function NewRecurringCampaignPage() {
   })
 
   useEffect(() => {
-    Promise.all([fetch('/api/lists').then(r => r.json()), fetch('/api/template-folders').then(r => r.json())])
-      .then(([ls, flds]) => {
-        const listsData = Array.isArray(ls) ? ls : []
-        setLists(listsData)
-        setFolders(Array.isArray(flds) ? flds : [])
-        if (listsData.length === 0) setShowNoListsModal(true)
-      })
+    Promise.all([
+      fetch('/api/lists').then(r => r.json()),
+      fetch('/api/template-folders').then(r => r.json()),
+      fetch('/api/settings').then(r => r.json()),
+    ]).then(([ls, flds, s]: [List[], FolderItem[], AccountSettings]) => {
+      const listsData = Array.isArray(ls) ? ls : []
+      setLists(listsData)
+      setFolders(Array.isArray(flds) ? flds : [])
+      setAccountSettings(s)
+      if (listsData.length === 0) setShowNoListsModal(true)
+      // Pre-fill from settings
+      setForm(f => ({
+        ...f,
+        from_name: s.sender_name || f.from_name,
+        from_email: s.sender_email || f.from_email,
+        reply_to: s.reply_to || f.reply_to,
+        timezone: s.timezone || f.timezone,
+      }))
+      // Check incomplete settings
+      const missing: string[] = []
+      if (!s.sender_email) missing.push('Sender email address (Account details → Email settings)')
+      if (!s.sender_name) missing.push('Sender name (Account details → Email settings)')
+      if (!s.company_address) missing.push('Company address (Account details → Business details) — required by CAN-SPAM')
+      if (missing.length > 0) setIncompleteModal(missing)
+    })
   }, [])
 
   function set(k: keyof typeof form) {
@@ -177,9 +229,12 @@ export default function NewRecurringCampaignPage() {
     }
   }
 
+  const hasDefaultSender = !!(accountSettings.sender_email && accountSettings.sender_name)
+
   return (
     <div className="max-w-2xl mx-auto">
       {showNoListsModal && <NoListsModal onClose={() => setShowNoListsModal(false)} />}
+      {incompleteModal && <IncompleteSettingsModal missing={incompleteModal} onClose={() => setIncompleteModal(null)} />}
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
 
       <div className="flex items-center gap-3 mb-6">
@@ -210,20 +265,43 @@ export default function NewRecurringCampaignPage() {
                 <input value={form.subject} onChange={set('subject')} placeholder="e.g., This week's updates from {{company}}"
                   className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name *</label>
-                <input value={form.from_name} onChange={set('from_name')} placeholder="Your Name"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email *</label>
-                <input type="email" value={form.from_email} onChange={set('from_email')} placeholder="you@yourcompany.com"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Reply-To (optional)</label>
-                <input type="email" value={form.reply_to} onChange={set('reply_to')} placeholder="replies@yourcompany.com"
-                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+              {/* From section — collapsible if settings filled */}
+              <div className="col-span-2">
+                {hasDefaultSender && !showFromEdit ? (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-0.5">From (account defaults)</p>
+                        <p className="text-sm text-gray-800 font-medium">{form.from_name} &lt;{form.from_email}&gt;</p>
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => setShowFromEdit(true)} className="text-xs font-medium text-blue-600 hover:text-blue-800 ml-4">Edit</button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">From Name *</label>
+                      <input value={form.from_name} onChange={set('from_name')} placeholder="Your Name"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">From Email *</label>
+                      <input type="email" value={form.from_email} onChange={set('from_email')} placeholder="you@yourcompany.com"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Reply-To (optional)</label>
+                      <input type="email" value={form.reply_to} onChange={set('reply_to')} placeholder="replies@yourcompany.com"
+                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+                    </div>
+                    {hasDefaultSender && (
+                      <div className="flex items-end">
+                        <button type="button" onClick={() => setShowFromEdit(false)} className="text-xs text-gray-400 hover:text-gray-600 pb-2.5">Use defaults</button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">CC (optional, comma-separated)</label>
