@@ -7,7 +7,7 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
-  const templates = db.prepare('SELECT id, name, category, subject, is_system, created_at, updated_at, html_body FROM templates WHERE user_id = ? OR is_system = 1 ORDER BY is_system DESC, created_at DESC').all(session.id)
+  const templates = db.prepare('SELECT id, name, category, subject, is_system, created_at, updated_at, html_body, folder_id FROM templates WHERE user_id = ? OR is_system = 1 ORDER BY is_system DESC, created_at DESC').all(session.id)
   return NextResponse.json(templates)
 }
 
