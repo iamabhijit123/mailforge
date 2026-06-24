@@ -962,15 +962,15 @@ function DeveloperTab({ me }: { me: MeUser }) {
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
-const TABS = [
-  { id: 'account', label: 'Account details' },
-  { id: 'emails', label: 'Account emails' },
-  { id: 'domains', label: 'Domain verification' },
-  { id: 'team', label: 'Team members' },
-  { id: 'developer', label: 'Developer' },
+const ALL_TABS = [
+  { id: 'account', label: 'Account details', adminOnly: false },
+  { id: 'emails', label: 'Account emails', adminOnly: false },
+  { id: 'domains', label: 'Domain verification', adminOnly: false },
+  { id: 'team', label: 'Team members', adminOnly: false },
+  { id: 'developer', label: 'Developer', adminOnly: true },
 ] as const
 
-type TabId = typeof TABS[number]['id']
+type TabId = typeof ALL_TABS[number]['id']
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings>({})
@@ -1027,7 +1027,7 @@ export default function SettingsPage() {
 
       <div className="border-b border-gray-200">
         <nav className="flex gap-1 overflow-x-auto">
-          {TABS.map(t => (
+          {ALL_TABS.filter(t => !t.adminOnly || me.isAdmin).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${tab === t.id ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-800 hover:border-gray-300'}`}
             >{t.label}</button>
