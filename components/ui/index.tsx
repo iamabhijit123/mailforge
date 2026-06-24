@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import React, { forwardRef } from 'react'
+import { TIMEZONE_OPTIONS } from '@/lib/timezones'
 
 // ─── Button ────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -252,31 +253,6 @@ export function EmptyState({ icon, title, description, action }: { icon?: React.
 }
 
 // ─── Schedule Date Time Picker ─────────────────────────────────────────────
-const TIMEZONES = [
-  { label: 'UTC (UTC±0)', iana: 'UTC' },
-  { label: 'HST – Hawaii (UTC-10)', iana: 'Pacific/Honolulu' },
-  { label: 'AKST/AKDT – Alaska (UTC-9/-8)', iana: 'America/Anchorage' },
-  { label: 'PST/PDT – Los Angeles (UTC-8/-7)', iana: 'America/Los_Angeles' },
-  { label: 'MST/MDT – Denver (UTC-7/-6)', iana: 'America/Denver' },
-  { label: 'CST/CDT – Chicago (UTC-6/-5)', iana: 'America/Chicago' },
-  { label: 'EST/EDT – New York (UTC-5/-4)', iana: 'America/New_York' },
-  { label: 'BRT – São Paulo (UTC-3)', iana: 'America/Sao_Paulo' },
-  { label: 'GMT/BST – London (UTC+0/+1)', iana: 'Europe/London' },
-  { label: 'CET/CEST – Paris/Berlin (UTC+1/+2)', iana: 'Europe/Paris' },
-  { label: 'EET/EEST – Athens/Cairo (UTC+2/+3)', iana: 'Europe/Athens' },
-  { label: 'MSK – Moscow (UTC+3)', iana: 'Europe/Moscow' },
-  { label: 'GST – Dubai (UTC+4)', iana: 'Asia/Dubai' },
-  { label: 'PKT – Pakistan/Karachi (UTC+5)', iana: 'Asia/Karachi' },
-  { label: 'IST – India (UTC+5:30)', iana: 'Asia/Kolkata' },
-  { label: 'BST – Bangladesh/Dhaka (UTC+6)', iana: 'Asia/Dhaka' },
-  { label: 'ICT – Bangkok/Vietnam (UTC+7)', iana: 'Asia/Bangkok' },
-  { label: 'CST – China/Beijing (UTC+8)', iana: 'Asia/Shanghai' },
-  { label: 'SGT – Singapore (UTC+8)', iana: 'Asia/Singapore' },
-  { label: 'JST – Japan (UTC+9)', iana: 'Asia/Tokyo' },
-  { label: 'KST – Korea (UTC+9)', iana: 'Asia/Seoul' },
-  { label: 'AEST/AEDT – Sydney (UTC+10/+11)', iana: 'Australia/Sydney' },
-  { label: 'NZST/NZDT – Auckland (UTC+12/+13)', iana: 'Pacific/Auckland' },
-]
 
 function localToUTC(localDatetime: string, ianaTimezone: string): string {
   if (!localDatetime) return ''
@@ -313,13 +289,13 @@ export function ScheduleDateTimePicker({ onChange, label, compact = false }: Sch
   const detectedIana = getDetectedTimezone()
   const [localDt, setLocalDt] = React.useState('')
   const [timezone, setTimezone] = React.useState(() => {
-    return TIMEZONES.find(t => t.iana === detectedIana)?.iana || 'UTC'
+    return TIMEZONE_OPTIONS.find(t => t.iana === detectedIana)?.iana || 'UTC'
   })
 
   // If detected tz isn't in our list, add it as a custom entry
-  const tzOptions = TIMEZONES.find(t => t.iana === detectedIana)
-    ? TIMEZONES
-    : [{ label: `Local – ${detectedIana}`, iana: detectedIana }, ...TIMEZONES]
+  const tzOptions = TIMEZONE_OPTIONS.find(t => t.iana === detectedIana)
+    ? TIMEZONE_OPTIONS
+    : [{ label: `Local – ${detectedIana}`, iana: detectedIana }, ...TIMEZONE_OPTIONS]
 
   function handleDateChange(val: string) {
     setLocalDt(val)

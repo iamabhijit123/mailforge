@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Toast } from '@/components/ui'
+import { TIMEZONE_OPTIONS, tzLabel } from '@/lib/timezones'
 import {
   Eye, EyeOff, Copy, Check, UserPlus, Trash2, Shield, User,
   ExternalLink, ArrowRightLeft, Lock, Mail, Globe, Clock, Image,
@@ -27,14 +28,6 @@ interface DomainVerification {
   return_path_host?: string; return_path_value?: string; return_path_verified: number
   created_at: string; verified_at?: string
 }
-
-const TIMEZONES = [
-  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
-  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
-  'Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo', 'Asia/Shanghai',
-  'Australia/Sydney', 'Pacific/Auckland', 'UTC',
-]
 
 // ─── Helper components ────────────────────────────────────────────────────────
 function SectionCard({ title, icon, children, onEdit, editLabel = 'Edit' }: {
@@ -299,7 +292,7 @@ function AccountDetailsTab({ settings, me, onSaveSettings, onSaveMe, toast }: {
               onChange={e => setDraft(d => ({ ...d, timezone: e.target.value }))}
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all bg-gray-50 focus:bg-white"
             >
-              {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>)}
+              {TIMEZONE_OPTIONS.map(tz => <option key={tz.iana} value={tz.iana}>{tz.label}</option>)}
             </select>
             <p className="text-xs text-gray-400 mt-1">Used for scheduling campaigns and recurring sends</p>
           </div>
@@ -307,7 +300,7 @@ function AccountDetailsTab({ settings, me, onSaveSettings, onSaveMe, toast }: {
         </div>
       ) : (
         <SectionCard title="Regional settings" icon={<Clock className="w-4 h-4" />} onEdit={me.isOwner ? () => startEdit('regional') : undefined}>
-          <Field label="Timezone" value={settings.timezone || 'America/New_York'} />
+          <Field label="Timezone" value={tzLabel(settings.timezone || 'America/New_York')} />
         </SectionCard>
       )}
 

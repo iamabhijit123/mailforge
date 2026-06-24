@@ -8,6 +8,7 @@ import {
   Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle,
 } from 'lucide-react'
 import Link from 'next/link'
+import { TIMEZONE_OPTIONS, tzLabel, todayInTz, currentTimeInTz } from '@/lib/timezones'
 
 interface List { id: string; name: string; contact_count: number }
 interface AccountSettings { sender_name?: string; sender_email?: string; reply_to?: string; timezone?: string; company_address?: string }
@@ -77,13 +78,6 @@ const FREQ_OPTIONS = [
   { value: 'monthly', label: 'Monthly', desc: 'Send once a month' },
 ]
 
-const TIMEZONES = [
-  'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
-  'America/Phoenix', 'America/Anchorage', 'Pacific/Honolulu',
-  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Moscow',
-  'Asia/Dubai', 'Asia/Kolkata', 'Asia/Dhaka', 'Asia/Bangkok', 'Asia/Singapore',
-  'Asia/Tokyo', 'Asia/Seoul', 'Australia/Sydney', 'Pacific/Auckland',
-]
 
 function StepIndicator({ current }: { current: number }) {
   return (
@@ -396,14 +390,20 @@ export default function NewRecurringCampaignPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Timezone</label>
               <select value={form.timezone} onChange={set('timezone')}
                 className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400">
-                {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz.replace('_', ' ')}</option>)}
+                {TIMEZONE_OPTIONS.map(tz => <option key={tz.iana} value={tz.iana}>{tz.label}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Send Time</label>
               <input type="time" value={form.send_time} onChange={set('send_time')}
+                min={form.start_date === todayInTz(form.timezone) ? currentTimeInTz(form.timezone) : undefined}
                 className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
-              <p className="text-xs text-gray-400 mt-1">Emails will be sent at this time in the selected timezone.</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Emails will be sent at this time in the selected timezone.
+                {form.start_date === todayInTz(form.timezone) && (
+                  <span className="text-amber-500 ml-1">Times before {currentTimeInTz(form.timezone)} are in the past today.</span>
+                )}
+              </p>
             </div>
           </div>
         )}
@@ -452,7 +452,7 @@ export default function NewRecurringCampaignPage() {
                   <span className="text-gray-400">Frequency</span><span className="font-medium text-gray-900 capitalize">{form.frequency}</span>
                   <span className="text-gray-400">Start</span><span className="font-medium text-gray-900">{form.start_date}</span>
                   <span className="text-gray-400">End</span><span className="font-medium text-gray-900">{form.end_date || 'Ongoing'}</span>
-                  <span className="text-gray-400">Send time</span><span className="font-medium text-gray-900">{form.send_time} ({form.timezone})</span>
+                  <span className="text-gray-400">Send time</span><span className="font-medium text-gray-900">{form.send_time} ({tzLabel(form.timezone)})</span>
                   <span className="text-gray-400">Lists</span><span className="font-medium text-gray-900">{form.list_ids.length} selected</span>
                   <span className="text-gray-400">Folder</span><span className="font-medium text-gray-900">{folders.find(f => f.id === form.template_folder_id)?.name}</span>
                   <span className="text-gray-400">Weekends</span><span className="font-medium text-gray-900">{form.allow_weekends ? 'Included' : 'Skipped (weekday only)'}</span>
