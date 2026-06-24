@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     start_date, end_date, allow_weekends, sends: manualSends,
   } = body
 
-  if (!name || !subject || !from_email || !frequency || !start_date || !end_date) {
+  if (!name || !subject || !from_email || !frequency || !start_date) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
   }
 
@@ -50,10 +50,17 @@ export async function POST(req: NextRequest) {
     send_time || '09:00', start_date, end_date
   )
 
+  // For ongoing campaigns (no end_date), generate 1 year of sends upfront
+  const effectiveEndDate = end_date || (() => {
+    const d = new Date(start_date + 'T12:00:00Z')
+    d.setUTCFullYear(d.getUTCFullYear() + 1)
+    return d.toISOString().slice(0, 10)
+  })()
+
   // Use manually adjusted sends if provided, otherwise auto-generate
   const schedule = manualSends?.length
     ? manualSends as Array<{ date: string; time: string; scheduledAt: string }>
-    : generateWeekdaySchedule(start_date, end_date, frequency as Frequency, send_time || '09:00', timezone || 'UTC', !!allow_weekends)
+    : generateWeekdaySchedule(start_date, effectiveEndDate, frequency as Frequency, send_time || '09:00', timezone || 'UTC', !!allow_weekends)
 
   const insertSend = db.prepare(
     'INSERT INTO recurring_sends (id, recurring_campaign_id, scheduled_date, scheduled_time, scheduled_at, is_adjusted) VALUES (?, ?, ?, ?, ?, ?)'
