@@ -7,7 +7,34 @@ import { randomUUID } from 'crypto'
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const domains = getDb().prepare('SELECT * FROM domain_verifications WHERE user_id = ? ORDER BY created_at DESC').all(session.id)
+
+  const db = getDb()
+  // Primary lookup by user_id; also catch records whose user_id drifted after a DB wipe
+  // by joining on email so the same person's domains survive a redeploy.
+  let domains = db.prepare(
+    'SELECT * FROM domain_verifications WHERE user_id = ? ORDER BY created_at DESC'
+  ).all(session.id)
+
+  if (domains.length === 0) {
+    // Fallback: find stale records belonging to any user with the same email (DB wipe scenario)
+    const stale = db.prepare(`
+      SELECT dv.* FROM domain_verifications dv
+      JOIN users u ON u.id = dv.user_id
+      WHERE lower(u.email) = lower(?)
+      ORDER BY dv.created_at DESC
+    `).all(session.email) as Array<Record<string, unknown>>
+
+    if (stale.length > 0) {
+      // Reassign all stale records to the current session user_id
+      for (const row of stale) {
+        db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, row.id)
+      }
+      domains = db.prepare(
+        'SELECT * FROM domain_verifications WHERE user_id = ? ORDER BY created_at DESC'
+      ).all(session.id)
+    }
+  }
+
   return NextResponse.json({ domains })
 }
 
@@ -27,13 +54,26 @@ export async function POST(req: NextRequest) {
   if (!cleanDomain || !cleanDomain.includes('.')) return NextResponse.json({ error: 'Enter a valid domain (e.g. example.com)' }, { status: 400 })
 
   const adminSettings = getAdminSettings()
-  if (!adminSettings.postmark_account_api_key) return NextResponse.json({ error: 'Postmark Account API token not configured. Ask the admin to add it under Admin → Settings → Postmark Account API Token.' }, { status: 400 })
+  if (!adminSettings.postmark_account_api_key) return NextResponse.json({ error: 'Postmark Account API token not configured. Ask the admin to add it under Admin → Settings.' }, { status: 400 })
 
   const db = getDb()
   const existing = db.prepare('SELECT * FROM domain_verifications WHERE domain = ?').get(cleanDomain) as Record<string, unknown> | undefined
+
   if (existing) {
-    if (existing.user_id !== session.id) return NextResponse.json({ error: 'This domain is already registered by another account.' }, { status: 409 })
-    return NextResponse.json({ domain: existing })
+    if (existing.user_id === session.id) {
+      // Same user, just return the existing record
+      return NextResponse.json({ domain: existing })
+    }
+
+    // Different user_id — check if it's actually the same person (DB wipe / redeploy scenario)
+    const originalOwner = db.prepare('SELECT email FROM users WHERE id = ?').get(existing.user_id as string) as { email: string } | undefined
+    if (originalOwner && originalOwner.email.toLowerCase() === session.email.toLowerCase()) {
+      // Reassign to current session user_id and return
+      db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, existing.id)
+      return NextResponse.json({ domain: db.prepare('SELECT * FROM domain_verifications WHERE id = ?').get(existing.id) })
+    }
+
+    return NextResponse.json({ error: 'This domain is already registered by another account.' }, { status: 409 })
   }
 
   // Create domain in Postmark
@@ -51,9 +91,11 @@ export async function POST(req: NextRequest) {
     const pmData = await pmRes.json() as Record<string, unknown>
 
     if (!pmRes.ok) {
-      // ErrorCode 505 = domain already in Postmark under this server — fetch its details
-      if (pmData.ErrorCode === 505) {
-        return NextResponse.json({ error: 'This domain already exists in Postmark. If it belongs to you, remove it from Postmark first.' }, { status: 409 })
+      if ((pmData.ErrorCode as number) === 505) {
+        // Domain already exists in Postmark — fetch its current details
+        return NextResponse.json({
+          error: 'This domain already exists in Postmark. Remove it from Postmark Domains first, then try again.',
+        }, { status: 409 })
       }
       return NextResponse.json({ error: (pmData.Message as string) || 'Postmark error' }, { status: 400 })
     }

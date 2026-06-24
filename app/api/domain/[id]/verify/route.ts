@@ -9,7 +9,16 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
 
   const db = getDb()
-  const record = db.prepare('SELECT * FROM domain_verifications WHERE id = ? AND user_id = ?').get(id, session.id) as Record<string, unknown> | undefined
+  // Accept by user_id OR by owner email (handles DB-wipe user_id drift)
+  let record = db.prepare('SELECT * FROM domain_verifications WHERE id = ? AND user_id = ?').get(id, session.id) as Record<string, unknown> | undefined
+  if (!record) {
+    record = db.prepare(`
+      SELECT dv.* FROM domain_verifications dv
+      JOIN users u ON u.id = dv.user_id
+      WHERE dv.id = ? AND lower(u.email) = lower(?)
+    `).get(id, session.email) as Record<string, unknown> | undefined
+    if (record) db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, id)
+  }
   if (!record) return NextResponse.json({ error: 'Domain not found' }, { status: 404 })
 
   const { postmark_account_api_key } = getAdminSettings()
