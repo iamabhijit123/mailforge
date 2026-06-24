@@ -288,7 +288,7 @@ interface ScheduleDateTimePickerProps {
 export function ScheduleDateTimePicker({ onChange, label, compact = false }: ScheduleDateTimePickerProps) {
   const detectedIana = getDetectedTimezone()
   const [localDt, setLocalDt] = React.useState('')
-  const [timezone, setTimezone] = React.useState(() => {
+  const [timezone, setTimezone] = React.useState<string>(() => {
     return TIMEZONE_OPTIONS.find(t => t.iana === detectedIana)?.iana || 'UTC'
   })
 
