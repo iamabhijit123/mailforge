@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth'
+import { getAdminSettings } from '@/lib/admin'
 import { getDb } from '@/lib/db'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -125,12 +126,14 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = getDb()
-  const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(session.id) as Record<string, string> | null
+  const userSettings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(session.id) as Record<string, string> | null
+  const adminSettings = getAdminSettings()
 
-  const apiKey = settings?.anthropic_api_key || process.env.ANTHROPIC_API_KEY
+  // Check user settings first, then admin-level key, then env var
+  const apiKey = userSettings?.anthropic_api_key || adminSettings.anthropic_api_key || process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'Anthropic API key not configured. Add it in Settings → AI Template Maker, or set ANTHROPIC_API_KEY in your .env file.' },
+      { error: 'Anthropic API key not configured. Add it in Admin → Settings, or set ANTHROPIC_API_KEY in your environment.' },
       { status: 400 }
     )
   }

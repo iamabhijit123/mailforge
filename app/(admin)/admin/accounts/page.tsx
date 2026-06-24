@@ -165,7 +165,7 @@ export default function AdminAccountsPage() {
                       </p>
                     </div>
                   </td>
-                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <Toggle
                         checked={!acc.is_disabled}
@@ -177,7 +177,7 @@ export default function AdminAccountsPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2">
                       <Toggle
                         checked={!!acc.api_access_enabled}
@@ -189,7 +189,7 @@ export default function AdminAccountsPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
                     <Toggle
                       checked={!!acc.is_admin}
                       disabled={saving === acc.id}

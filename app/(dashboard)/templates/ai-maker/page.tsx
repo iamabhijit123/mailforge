@@ -8,9 +8,9 @@ export default function AiTemplateMakerPage() {
   const [hasKey, setHasKey] = useState<boolean | null>(null)
 
   useEffect(() => {
-    fetch('/api/settings')
+    fetch('/api/ai-status')
       .then(r => r.json())
-      .then(s => setHasKey(!!(s.anthropic_api_key)))
+      .then(s => setHasKey(!!(s.available)))
       .catch(() => setHasKey(false))
   }, [])
 
@@ -20,9 +20,9 @@ export default function AiTemplateMakerPage() {
         <div className="mx-6 mt-4 mb-0 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-3 flex-shrink-0">
           <Settings className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <p className="text-sm text-amber-800">
-            Add your Anthropic API key in{' '}
-            <Link href="/settings" className="underline font-semibold">Settings</Link>{' '}
-            to use the AI Template Maker.
+            Anthropic API key not configured.{' '}
+            <Link href="/admin/settings" className="underline font-semibold">Admin → Settings</Link>{' '}
+            to add it and enable the AI Template Maker.
           </p>
         </div>
       )}
