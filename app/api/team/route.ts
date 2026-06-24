@@ -27,14 +27,21 @@ export async function POST(req: NextRequest) {
   const { email, name, role } = await req.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
 
+  const normalEmail = email.toLowerCase().trim()
+
+  // Block self-invite
+  if (normalEmail === session.email.toLowerCase()) {
+    return NextResponse.json({ error: "You can't invite yourself — you're already the account owner." }, { status: 400 })
+  }
+
   const db = getDb()
 
-  // Check if already invited
-  const existing = db.prepare('SELECT id FROM team_members WHERE owner_id = ? AND email = ?').get(session.id, email.toLowerCase().trim())
+  // Check for duplicate invite
+  const existing = db.prepare('SELECT id FROM team_members WHERE owner_id = ? AND email = ?').get(session.id, normalEmail)
   if (existing) return NextResponse.json({ error: 'This email has already been invited' }, { status: 409 })
 
-  // Check if this email already has an account linked to this workspace
-  const existingUser = db.prepare('SELECT id FROM users WHERE email = ? AND workspace_id = ?').get(email.toLowerCase().trim(), session.id)
+  // Check if already an active member
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ? AND workspace_id = ?').get(normalEmail, session.id)
   if (existingUser) return NextResponse.json({ error: 'This user is already a member of your account' }, { status: 409 })
 
   const id = crypto.randomUUID()
@@ -43,7 +50,7 @@ export async function POST(req: NextRequest) {
   db.prepare(`
     INSERT INTO team_members (id, owner_id, email, name, role, invite_token)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, session.id, email.toLowerCase().trim(), name?.trim() || null, role || 'member', invite_token)
+  `).run(id, session.id, normalEmail, name?.trim() || null, role || 'member', invite_token)
 
   const member = db.prepare('SELECT * FROM team_members WHERE id = ?').get(id)
   return NextResponse.json({ member, invite_token }, { status: 201 })

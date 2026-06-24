@@ -400,6 +400,18 @@ function initSchema(db: Database.Database) {
       )`)
     }
   } catch {}
+
+  // Remove self-invite duplicates: team_members rows where email matches the owner's own email
+  try {
+    db.exec(`
+      DELETE FROM team_members
+      WHERE id IN (
+        SELECT tm.id FROM team_members tm
+        JOIN users u ON u.id = tm.owner_id
+        WHERE lower(tm.email) = lower(u.email)
+      )
+    `)
+  } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).

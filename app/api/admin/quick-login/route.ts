@@ -1,4 +1,4 @@
-// Admin quick-login — tries env var credentials first, falls back to DB is_admin users
+// Admin quick-login — tries env var credentials first, then DB bcrypt fallback
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { signToken, COOKIE_NAME } from '@/lib/auth'
@@ -13,16 +13,13 @@ export async function POST(req: NextRequest) {
   const adminEmailEnv = process.env.ADMIN_EMAIL
   const adminPasswordEnv = process.env.ADMIN_PASSWORD
 
-  // ── Method 1: env var plain-text credentials ──────────────────────────────
+  // ── Method 1: env var plain-text match ────────────────────────────────────
   if (adminEmailEnv && adminPasswordEnv) {
     if (password !== adminPasswordEnv) {
       return NextResponse.json({ error: 'Incorrect admin password.' }, { status: 401 })
     }
-
-    // Find or create the admin user row
     let user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(adminEmailEnv.toLowerCase()) as
       { id: string; name: string; email: string } | undefined
-
     if (!user) {
       const id = randomUUID()
       db.prepare(`INSERT OR IGNORE INTO users (id, email, name, password_hash, is_workspace_owner, is_admin)
@@ -30,45 +27,42 @@ export async function POST(req: NextRequest) {
       user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(adminEmailEnv.toLowerCase()) as
         { id: string; name: string; email: string } | undefined
     }
-
     if (!user) return NextResponse.json({ error: 'Could not resolve admin user' }, { status: 500 })
-
-    // Ensure is_admin is set in DB
     db.prepare('UPDATE users SET is_admin = 1 WHERE email = ?').run(adminEmailEnv.toLowerCase())
-
     return buildSession(user.id, user.name || 'Admin', user.email)
   }
 
-  // ── Method 2: DB fallback — any user with is_admin=1 + bcrypt password ───
+  // ── Method 2: DB is_admin=1 users with real bcrypt password ───────────────
   const adminUsers = db.prepare(
     `SELECT id, name, email, password_hash FROM users WHERE is_admin = 1`
   ).all() as { id: string; name: string; email: string; password_hash: string }[]
 
   for (const u of adminUsers) {
-    if (u.password_hash && u.password_hash !== 'jwt-authenticated' && u.password_hash !== 'admin-env-auth') {
-      const valid = await bcrypt.compare(password, u.password_hash)
-      if (valid) return buildSession(u.id, u.name, u.email)
+    const ph = u.password_hash
+    if (ph && ph !== 'jwt-authenticated' && ph !== 'admin-env-auth') {
+      if (await bcrypt.compare(password, ph)) return buildSession(u.id, u.name, u.email)
     }
   }
 
-  // ── Method 3: first workspace owner fallback (no is_admin flag set yet) ──
-  if (adminEmailEnv) {
-    const ownerUser = db.prepare(
-      `SELECT id, name, email, password_hash FROM users WHERE email = ? AND password_hash != 'jwt-authenticated'`
-    ).get(adminEmailEnv.toLowerCase()) as { id: string; name: string; email: string; password_hash: string } | undefined
+  // ── Method 3: first workspace owner with real bcrypt password ─────────────
+  // Covers fresh DBs where is_admin hasn't been set yet
+  const firstOwner = db.prepare(
+    `SELECT id, name, email, password_hash FROM users
+     WHERE workspace_id IS NULL AND password_hash != 'jwt-authenticated' AND password_hash != 'admin-env-auth'
+     ORDER BY created_at ASC LIMIT 1`
+  ).get() as { id: string; name: string; email: string; password_hash: string } | undefined
 
-    if (ownerUser) {
-      const valid = await bcrypt.compare(password, ownerUser.password_hash)
-      if (valid) {
-        db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(ownerUser.id)
-        return buildSession(ownerUser.id, ownerUser.name, ownerUser.email)
-      }
-      return NextResponse.json({ error: 'Incorrect admin password.' }, { status: 401 })
+  if (firstOwner) {
+    if (await bcrypt.compare(password, firstOwner.password_hash)) {
+      // Grant is_admin so future logins use Method 2
+      db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(firstOwner.id)
+      return buildSession(firstOwner.id, firstOwner.name, firstOwner.email)
     }
+    return NextResponse.json({ error: 'Incorrect admin password.' }, { status: 401 })
   }
 
   return NextResponse.json({
-    error: 'No admin account found. Register your account first, then try again.',
+    error: 'No registered account found. Register at /register first, then come back here.',
   }, { status: 404 })
 }
 
