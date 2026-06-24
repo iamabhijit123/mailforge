@@ -101,10 +101,19 @@ export default function AdminAccountsPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <table className="min-w-full">
+        <table className="min-w-full table-fixed">
+          <colgroup>
+            <col className="w-8" />
+            <col className="w-64" />
+            <col className="w-44" />
+            <col className="w-40" />
+            <col className="w-36" />
+            <col className="w-28" />
+            <col className="w-20" />
+          </colgroup>
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-8" />
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" />
               {['Account', 'Usage', 'Team / Domains', 'Account active', 'API access', 'Admin'].map(h => (
                 <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
               ))}
