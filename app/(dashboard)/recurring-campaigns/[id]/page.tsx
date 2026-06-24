@@ -8,6 +8,7 @@ import {
   Edit2, Check, X, RotateCcw, FolderOpen, AlertCircle,
 } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
+import { tzLabel } from '@/lib/timezones'
 
 interface RecurringCampaign {
   id: string; name: string; subject: string; status: string; frequency: string
@@ -39,12 +40,28 @@ const FREQ_LABEL: Record<string, string> = {
   daily: 'Daily', weekly: 'Weekly', biweekly: 'Bi-weekly', monthly: 'Monthly',
 }
 
+/** Convert a local YYYY-MM-DDTHH:MM time in a given IANA timezone to a UTC ISO string */
+function localToUTC(date: string, time: string, ianaTimezone: string): string {
+  const localDt = `${date}T${time}:00`
+  // Build a UTC guess, then correct for the tz offset using Intl formatting
+  const guess = new Date(localDt + 'Z')
+  const guessInTz = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: ianaTimezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).format(guess)
+  const offset = guess.getTime() - new Date(guessInTz.replace(' ', 'T') + 'Z').getTime()
+  return new Date(guess.getTime() + offset).toISOString()
+}
+
 function EditSendModal({
   send,
+  timezone,
   onClose,
   onSave,
 }: {
   send: RecurringSend
+  timezone: string
   onClose: () => void
   onSave: (sendId: string, scheduledDate: string, scheduledTime: string, scheduledAt: string) => Promise<void>
 }) {
@@ -54,8 +71,8 @@ function EditSendModal({
 
   async function handleSave() {
     setSaving(true)
-    const localDt = `${date}T${time}:00`
-    const utcAt = new Date(localDt).toISOString()
+    // Use campaign's timezone for UTC conversion — NOT the browser's local timezone
+    const utcAt = localToUTC(date, time, timezone)
     await onSave(send.id, date, time, utcAt)
     setSaving(false)
     onClose()
@@ -75,7 +92,9 @@ function EditSendModal({
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Time</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Time <span className="text-xs text-gray-400 font-normal">({timezone})</span>
+            </label>
             <input type="time" value={time} onChange={e => setTime(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
           </div>
@@ -146,7 +165,7 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
     <div className="space-y-5 max-w-4xl">
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       {editingSend && (
-        <EditSendModal send={editingSend} onClose={() => setEditingSend(null)} onSave={adjustSend} />
+        <EditSendModal send={editingSend} timezone={campaign?.timezone || 'UTC'} onClose={() => setEditingSend(null)} onSave={adjustSend} />
       )}
 
       {/* Header */}
@@ -206,7 +225,7 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
         <h2 className="text-sm font-semibold text-gray-900 mb-4">Campaign Details</h2>
         <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
           <div><span className="text-gray-400 text-xs block">From</span><span className="font-medium text-gray-900">{campaign.from_name} &lt;{campaign.from_email}&gt;</span></div>
-          <div><span className="text-gray-400 text-xs block">Send Time</span><span className="font-medium text-gray-900">{campaign.send_time} ({campaign.timezone})</span></div>
+          <div><span className="text-gray-400 text-xs block">Send Time</span><span className="font-medium text-gray-900">{campaign.send_time} ({tzLabel(campaign.timezone)})</span></div>
           <div><span className="text-gray-400 text-xs block">Start Date</span><span className="font-medium text-gray-900">{formatDate(campaign.start_date)}</span></div>
           <div><span className="text-gray-400 text-xs block">End Date</span><span className="font-medium text-gray-900">{campaign.end_date ? formatDate(campaign.end_date) : 'Ongoing'}</span></div>
           {campaign.folder_name && <div><span className="text-gray-400 text-xs block">Template Folder</span><span className="font-medium text-gray-900 flex items-center gap-1.5"><FolderOpen className="w-3.5 h-3.5 text-gray-400" />{campaign.folder_name}</span></div>}
