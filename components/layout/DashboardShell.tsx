@@ -47,7 +47,10 @@ export function DashboardShell({ children, user }: Props) {
       >
         <Header user={user} />
         {isFullScreen ? (
-          <div className="flex-1 flex flex-col overflow-hidden">{children}</div>
+          // Explicit height so child iframes can use h-full / flex-1 reliably
+          <div style={{ height: 'calc(100vh - 3.5rem)' }} className="flex flex-col overflow-hidden">
+            {children}
+          </div>
         ) : (
           <main className="flex-1 p-6 w-full">{children}</main>
         )}
