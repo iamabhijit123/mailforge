@@ -419,7 +419,7 @@ export default function NewRecurringCampaignPage() {
                 <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
                   <FolderOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-500 mb-2">No template folders yet.</p>
-                  <Link href="/templates" target="_blank" className="text-sm text-blue-600 hover:underline">Create a folder in Templates →</Link>
+                  <Link href="/templates/groups/new" target="_blank" className="text-sm text-blue-600 hover:underline">Create a folder in Templates →</Link>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
