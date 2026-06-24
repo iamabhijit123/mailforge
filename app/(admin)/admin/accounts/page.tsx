@@ -100,23 +100,17 @@ export default function AdminAccountsPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <table className="min-w-full table-fixed">
-          <colgroup>
-            <col className="w-8" />
-            <col className="w-64" />
-            <col className="w-44" />
-            <col className="w-40" />
-            <col className="w-36" />
-            <col className="w-28" />
-            <col className="w-20" />
-          </colgroup>
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
+        <table className="w-full" style={{ minWidth: 860 }}>
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider" />
-              {['Account', 'Usage', 'Team / Domains', 'Account active', 'API access', 'Admin'].map(h => (
-                <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
-              ))}
+              <th className="pl-4 pr-1 py-3 w-8" />
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Usage</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Team / Domains</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">Account active</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">API access</th>
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Admin</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -174,8 +168,8 @@ export default function AdminAccountsPage() {
                       </p>
                     </div>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-2">
+                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-col items-start gap-1">
                       <Toggle
                         checked={!acc.is_disabled}
                         disabled={saving === acc.id}
@@ -186,8 +180,8 @@ export default function AdminAccountsPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-2">
+                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex flex-col items-start gap-1">
                       <Toggle
                         checked={!!acc.api_access_enabled}
                         disabled={saving === acc.id}
@@ -198,7 +192,7 @@ export default function AdminAccountsPage() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                  <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
                     <Toggle
                       checked={!!acc.is_admin}
                       disabled={saving === acc.id}
