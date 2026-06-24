@@ -88,7 +88,7 @@ export default function AdminOverviewPage() {
                       <div>
                         <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
                           {acc.name}
-                          {acc.is_admin ? <Shield className="w-3 h-3 text-blue-500" title="Admin" /> : null}
+                          {acc.is_admin ? <Shield className="w-3 h-3 text-blue-500" aria-label="Admin" /> : null}
                         </p>
                         <p className="text-xs text-gray-500">{acc.email}</p>
                       </div>
