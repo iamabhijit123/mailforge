@@ -355,6 +355,51 @@ function initSchema(db: Database.Database) {
       created_at TEXT DEFAULT (datetime('now'))
     )
   `) } catch {}
+
+  // Admin settings (global key-value store for SaaS master config)
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
+
+  // Domain verifications — Postmark DKIM/Return-Path per workspace
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS domain_verifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      postmark_domain_id TEXT,
+      dkim_host TEXT,
+      dkim_value TEXT,
+      dkim_verified INTEGER DEFAULT 0,
+      return_path_host TEXT,
+      return_path_value TEXT,
+      return_path_verified INTEGER DEFAULT 0,
+      status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now')),
+      verified_at TEXT,
+      UNIQUE(domain),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `) } catch {}
+
+  // SaaS account control columns
+  try { db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN api_access_enabled INTEGER DEFAULT 1`) } catch {}
+
+  // Auto-grant admin to first workspace owner if no admins exist yet
+  try {
+    const adminCount = (db.prepare(`SELECT COUNT(*) as c FROM users WHERE is_admin = 1`).get() as { c: number }).c
+    if (adminCount === 0) {
+      db.exec(`UPDATE users SET is_admin = 1 WHERE id = (
+        SELECT id FROM users WHERE (workspace_id IS NULL OR is_workspace_owner = 1) ORDER BY created_at ASC LIMIT 1
+      )`)
+    }
+  } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).

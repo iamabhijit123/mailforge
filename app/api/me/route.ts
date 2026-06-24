@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession, signToken, COOKIE_NAME } from '@/lib/auth'
 import { getDb } from '@/lib/db'
+import { isAdmin } from '@/lib/admin'
 
 export async function GET() {
   const session = await getSession()
@@ -15,6 +16,7 @@ export async function GET() {
     phone: user?.phone || '',
     role: session.role,
     isOwner: session.isOwner,
+    isAdmin: isAdmin(session),
   })
 }
 

@@ -5,7 +5,8 @@ import { Toast } from '@/components/ui'
 import {
   Eye, EyeOff, Copy, Check, UserPlus, Trash2, Shield, User,
   ExternalLink, ArrowRightLeft, Lock, Mail, Globe, Clock, Image,
-  FileText, ToggleLeft, ToggleRight, ChevronRight, AtSign, CheckCircle, AlertCircle,
+  FileText, ChevronRight, AtSign, CheckCircle, AlertCircle,
+  Plus, RefreshCw, X, LayoutDashboard,
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -19,7 +20,13 @@ interface Settings {
   footer_show_unsubscribe_comment?: number; footer_fine_print?: string
 }
 interface TeamMember { id: string; email: string; name: string | null; role: string; status: 'pending' | 'active'; invited_at: string }
-interface MeUser { id: string; memberId: string; email: string; name: string; phone?: string; isOwner: boolean }
+interface MeUser { id: string; memberId: string; email: string; name: string; phone?: string; isOwner: boolean; isAdmin?: boolean }
+interface DomainVerification {
+  id: string; domain: string; status: 'pending' | 'verified'
+  dkim_host?: string; dkim_value?: string; dkim_verified: number
+  return_path_host?: string; return_path_value?: string; return_path_verified: number
+  created_at: string; verified_at?: string
+}
 
 const TIMEZONES = [
   'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
@@ -664,47 +671,275 @@ function TeamMembersTab({ me, onOwnershipTransferred }: { me: MeUser; onOwnershi
   )
 }
 
-// ─── Tab: Developer settings ──────────────────────────────────────────────────
-function DeveloperTab({ settings, me, onSave }: { settings: Settings; me: MeUser; onSave: (s: Settings) => Promise<boolean> }) {
-  const [editing, setEditing] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Settings>(settings)
-  const [saving, setSaving] = useState(false)
-  const [copied, setCopied] = useState(false)
-  const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
-  const webhookUrl = `${appUrl}/api/webhooks/postmark`
+// ─── Tab: Domain verification ─────────────────────────────────────────────────
+function DnsRecord({ type, host, value }: { type: string; host: string; value: string }) {
+  const [copiedField, setCopied] = useState('')
+  function copy(text: string, field: string) { navigator.clipboard.writeText(text); setCopied(field); setTimeout(() => setCopied(''), 2000) }
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="bg-gray-50 px-4 py-2 flex items-center gap-2 border-b border-gray-200">
+        <span className="text-xs font-bold text-gray-700 bg-white border border-gray-200 px-2 py-0.5 rounded">{type}</span>
+        <span className="text-xs text-gray-500">record</span>
+      </div>
+      <div className="p-4 space-y-3">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-1">Host / Name</p>
+          <div className="flex items-center gap-2">
+            <code className="text-xs bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 break-all font-mono">{host}</code>
+            <button onClick={() => copy(host, 'host')} className="flex-shrink-0 text-gray-400 hover:text-blue-600">
+              {copiedField === 'host' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-500 mb-1">Value</p>
+          <div className="flex items-start gap-2">
+            <code className="text-xs bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 flex-1 break-all font-mono">{value}</code>
+            <button onClick={() => copy(value, 'value')} className="flex-shrink-0 mt-1 text-gray-400 hover:text-blue-600">
+              {copiedField === 'value' ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  function startEdit(section: string) { setDraft(settings); setEditing(section) }
-  async function save() { setSaving(true); const ok = await onSave(draft); setSaving(false); if (ok) setEditing(null) }
-  const s = (k: keyof Settings) => (v: string) => setDraft(d => ({ ...d, [k]: v }))
-  function copyWebhook() { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+function DomainsTab({ me }: { me: MeUser }) {
+  const [domains, setDomains] = useState<DomainVerification[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newDomain, setNewDomain] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [verifying, setVerifying] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  async function load() {
+    const res = await fetch('/api/domain')
+    if (res.ok) { const d = await res.json(); setDomains(d.domains || []) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  async function addDomain() {
+    if (!newDomain.trim()) return
+    setSubmitting(true); setError('')
+    const res = await fetch('/api/domain', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ domain: newDomain.trim() }),
+    })
+    setSubmitting(false)
+    if (res.ok) {
+      const d = await res.json()
+      setDomains(prev => [d.domain, ...prev.filter(x => x.id !== d.domain.id)])
+      setExpanded(d.domain.id)
+      setShowAdd(false); setNewDomain('')
+    } else {
+      const d = await res.json()
+      setError(d.error || 'Failed to add domain')
+    }
+  }
+
+  async function verify(id: string) {
+    setVerifying(id)
+    const res = await fetch(`/api/domain/${id}/verify`, { method: 'POST' })
+    setVerifying(null)
+    if (res.ok) {
+      const d = await res.json()
+      setDomains(prev => prev.map(x => x.id === id ? d.domain : x))
+      if (d.verified) setToast({ msg: 'Domain verified! You can now send from this domain.', type: 'success' })
+      else setToast({ msg: 'DNS records not found yet. It can take up to 48 hours for DNS to propagate.', type: 'error' })
+    }
+  }
+
+  async function remove(id: string, domain: string) {
+    if (!confirm(`Remove ${domain}? This will also remove it from Postmark.`)) return
+    const res = await fetch(`/api/domain/${id}`, { method: 'DELETE' })
+    if (res.ok) setDomains(prev => prev.filter(x => x.id !== id))
+  }
 
   if (!me.isOwner) return (
     <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
       <Shield className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-      <p className="text-gray-500 text-sm">Only the account owner can change developer settings.</p>
+      <p className="text-gray-500 text-sm">Only the account owner can manage domain verification.</p>
     </div>
   )
 
   return (
     <div className="space-y-5">
-      {editing === 'postmark' ? (
-        <div className="bg-white rounded-2xl border border-blue-300 p-6 space-y-4">
-          <h3 className="font-semibold text-gray-900">Postmark configuration</h3>
-          <SecretField label="Server API Token" value={draft.postmark_api_key || ''} onChange={s('postmark_api_key')} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" hint="Get this from your Postmark server settings" />
-          <EditField label="Message stream" name="stream" value={draft.postmark_message_stream || 'broadcast'} onChange={s('postmark_message_stream')} hint="Use 'broadcast' for marketing emails (default)" />
-          <SaveCancel saving={saving} onSave={save} onCancel={() => setEditing(null)} />
+      {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
+
+      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800">
+        <strong>Why verify your domain?</strong> When your domain (e.g., <code className="bg-blue-100 px-1 rounded">aptnetwork.com</code>) is verified, emails go out as <code className="bg-blue-100 px-1 rounded">From: you@aptnetwork.com</code> — which Gmail and Outlook recognise as legitimate. Without verification, emails use our default sender address with your email in Reply-To.
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-gray-800">Your domains</h3>
+        {!showAdd && (
+          <button onClick={() => setShowAdd(true)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors">
+            <Plus className="w-3.5 h-3.5" /> Add domain
+          </button>
+        )}
+      </div>
+
+      {showAdd && (
+        <div className="bg-white rounded-2xl border border-blue-300 p-5 space-y-3">
+          <p className="text-sm font-semibold text-gray-800">Add a sending domain</p>
+          {error && <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{error}</div>}
+          <div className="flex gap-2">
+            <input
+              type="text" value={newDomain} onChange={e => setNewDomain(e.target.value)}
+              placeholder="yourdomain.com" autoFocus
+              onKeyDown={e => e.key === 'Enter' && addDomain()}
+              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 bg-gray-50 focus:bg-white"
+            />
+            <button onClick={addDomain} disabled={submitting || !newDomain.trim()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl disabled:opacity-60">
+              {submitting ? 'Adding…' : 'Add'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setError('') }} className="px-3 py-2 text-sm text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50">
+              Cancel
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">Enter the root domain only — e.g. <code>aptnetwork.com</code>, not <code>www.aptnetwork.com</code></p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-8 text-center text-sm text-gray-400">Loading…</div>
+      ) : domains.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-10 text-center">
+          <Globe className="w-10 h-10 text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-500">No domains added yet</p>
+          <p className="text-xs text-gray-400 mt-1">Add your sending domain to improve deliverability</p>
         </div>
       ) : (
-        <SectionCard title="Postmark configuration" onEdit={() => startEdit('postmark')}>
-          <div className="space-y-3">
-            <Field label="Server API Token" value={settings.postmark_api_key ? '••••••••' + settings.postmark_api_key.slice(-4) : undefined} placeholder="Not configured" />
-            <Field label="Message stream" value={settings.postmark_message_stream || 'broadcast'} />
+        <div className="space-y-3">
+          {domains.map(d => (
+            <div key={d.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              <div className="flex items-center gap-3 px-5 py-4">
+                <Globe className={`w-5 h-5 flex-shrink-0 ${d.status === 'verified' ? 'text-green-500' : 'text-amber-500'}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{d.domain}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Added {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {d.status === 'verified' ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                      <CheckCircle className="w-3 h-3" /> Verified
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                      <AlertCircle className="w-3 h-3" /> Pending DNS
+                    </span>
+                  )}
+                  {d.status !== 'verified' && (
+                    <button
+                      onClick={() => verify(d.id)} disabled={verifying === d.id}
+                      className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${verifying === d.id ? 'animate-spin' : ''}`} />
+                      {verifying === d.id ? 'Checking…' : 'Verify now'}
+                    </button>
+                  )}
+                  <button onClick={() => setExpanded(expanded === d.id ? null : d.id)} className="text-xs text-gray-500 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100">
+                    {expanded === d.id ? 'Hide DNS' : 'Show DNS'}
+                  </button>
+                  <button onClick={() => remove(d.id, d.domain)} className="text-gray-400 hover:text-red-600 p-1 rounded hover:bg-red-50">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {expanded === d.id && (
+                <div className="border-t border-gray-100 px-5 py-4 bg-gray-50/50 space-y-4">
+                  <p className="text-sm font-semibold text-gray-700">Add these DNS records to <strong>{d.domain}</strong> in your DNS provider</p>
+
+                  {d.dkim_host && d.dkim_value && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">DKIM (required for email authentication)</p>
+                      <DnsRecord type="TXT" host={d.dkim_host} value={d.dkim_value} />
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {d.dkim_verified ? (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-3 h-3" /> DKIM verified</span>
+                        ) : (
+                          <span className="text-xs text-amber-600 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Not verified yet</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {d.return_path_host && d.return_path_value && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Return Path (improves bounce handling)</p>
+                      <DnsRecord type="CNAME" host={d.return_path_host} value={d.return_path_value} />
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        {d.return_path_verified ? (
+                          <span className="text-xs text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Return path verified</span>
+                        ) : (
+                          <span className="text-xs text-amber-600 font-medium flex items-center gap-1"><AlertCircle className="w-3 h-3" /> Not verified yet</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">SPF (add to existing SPF record)</p>
+                    <div className="border border-gray-200 rounded-xl p-3 bg-white text-xs text-gray-600">
+                      Add <code className="bg-gray-100 px-1 rounded font-mono">include:spf.mtasv.net</code> to your existing TXT SPF record.
+                      If you have no SPF record, create one: <code className="bg-gray-100 px-1 rounded font-mono">v=spf1 include:spf.mtasv.net ~all</code>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">DMARC (recommended)</p>
+                    <DnsRecord type="TXT" host={`_dmarc.${d.domain}`} value={`v=DMARC1; p=none; rua=mailto:dmarc@${d.domain}`} />
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                    DNS changes can take up to 48 hours to propagate. Click "Verify now" after adding the records.
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Tab: Developer settings ──────────────────────────────────────────────────
+function DeveloperTab({ me }: { me: MeUser }) {
+  const [copied, setCopied] = useState(false)
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  const webhookUrl = `${appUrl}/api/webhooks/postmark`
+  function copyWebhook() { navigator.clipboard.writeText(webhookUrl); setCopied(true); setTimeout(() => setCopied(false), 2000) }
+
+  if (!me.isOwner) return (
+    <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center">
+      <Shield className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+      <p className="text-gray-500 text-sm">Only the account owner can view developer settings.</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-5">
+      {me.isAdmin && (
+        <div className="bg-gray-900 text-white rounded-2xl p-5 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Admin Panel</p>
+            <p className="text-sm text-gray-400 mt-0.5">Manage API keys, all accounts, and platform settings</p>
           </div>
-        </SectionCard>
+          <a href="/admin" className="flex items-center gap-2 px-4 py-2 bg-white text-gray-900 text-sm font-semibold rounded-xl hover:bg-gray-100 transition-colors">
+            <LayoutDashboard className="w-4 h-4" /> Open Admin Panel
+          </a>
+        </div>
       )}
 
       <SectionCard title="Postmark webhook">
-        <p className="text-sm text-gray-600 mb-3">Add this URL in Postmark to track opens, clicks, and bounces.</p>
+        <p className="text-sm text-gray-600 mb-3">Add this URL in Postmark to track opens, clicks, and bounces in real time.</p>
         <div className="flex items-center gap-2 bg-gray-50 rounded-xl border border-gray-200 px-3 py-2.5">
           <code className="text-xs text-gray-700 flex-1 break-all">{webhookUrl}</code>
           <button onClick={copyWebhook} className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800">
@@ -717,19 +952,11 @@ function DeveloperTab({ settings, me, onSave }: { settings: Settings; me: MeUser
         </a>
       </SectionCard>
 
-      {editing === 'ai' ? (
-        <div className="bg-white rounded-2xl border border-blue-300 p-6 space-y-4">
-          <h3 className="font-semibold text-gray-900">AI Template Maker</h3>
-          <SecretField label="Anthropic API Key" value={draft.anthropic_api_key || ''} onChange={s('anthropic_api_key')} placeholder="sk-ant-..." hint="Used only for the AI Template Maker — stored locally" />
-          <SaveCancel saving={saving} onSave={save} onCancel={() => setEditing(null)} />
-        </div>
-      ) : (
-        <SectionCard title="AI Template Maker" onEdit={() => startEdit('ai')}>
-          <p className="text-sm text-gray-500 mb-3">Generate professional email templates using Claude AI.</p>
-          <Field label="Anthropic API Key" value={settings.anthropic_api_key ? '••••••••' + settings.anthropic_api_key.slice(-4) : undefined} placeholder="Not configured" />
-          <a href="/templates/ai-maker" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline mt-3"><ExternalLink className="w-3.5 h-3.5" /> Open AI Template Maker</a>
-        </SectionCard>
-      )}
+      <SectionCard title="AI Template Maker">
+        <p className="text-sm text-gray-500 mb-3">Generate professional email templates using Claude AI.</p>
+        <p className="text-sm text-gray-500">API key is managed by your platform administrator.</p>
+        <a href="/templates/ai-maker" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline mt-3"><ExternalLink className="w-3.5 h-3.5" /> Open AI Template Maker</a>
+      </SectionCard>
     </div>
   )
 }
@@ -738,8 +965,9 @@ function DeveloperTab({ settings, me, onSave }: { settings: Settings; me: MeUser
 const TABS = [
   { id: 'account', label: 'Account details' },
   { id: 'emails', label: 'Account emails' },
+  { id: 'domains', label: 'Domain verification' },
   { id: 'team', label: 'Team members' },
-  { id: 'developer', label: 'Developer settings' },
+  { id: 'developer', label: 'Developer' },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -788,6 +1016,11 @@ export default function SettingsPage() {
           <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${me.isOwner ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
             <Shield className="w-3 h-3" />{me.isOwner ? 'Account owner' : 'Team member'}
           </span>
+          {me.isAdmin && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-900 text-white">
+              <Shield className="w-3 h-3" /> Admin
+            </span>
+          )}
           <span className="text-sm text-gray-500">{me.email}</span>
         </div>
       </div>
@@ -804,8 +1037,9 @@ export default function SettingsPage() {
 
       {tab === 'account' && <AccountDetailsTab settings={settings} me={me} onSaveSettings={saveSettings} onSaveMe={saveMe} toast={showToast} />}
       {tab === 'emails' && <AccountEmailsTab settings={settings} me={me} />}
+      {tab === 'domains' && <DomainsTab me={me} />}
       {tab === 'team' && <TeamMembersTab me={me} onOwnershipTransferred={() => window.location.reload()} />}
-      {tab === 'developer' && <DeveloperTab settings={settings} me={me} onSave={saveSettings} />}
+      {tab === 'developer' && <DeveloperTab me={me} />}
     </div>
   )
 }

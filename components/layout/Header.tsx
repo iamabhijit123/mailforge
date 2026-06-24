@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, Settings, LogOut, HelpCircle, Sparkles, UserCircle } from 'lucide-react'
+import { ChevronDown, Settings, LogOut, HelpCircle, Sparkles, UserCircle, LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
 
 interface HeaderProps {
-  user?: { name: string; email: string }
+  user?: { name: string; email: string; isAdmin?: boolean }
 }
 
 export function Header({ user }: HeaderProps) {
@@ -84,6 +84,20 @@ export function Header({ user }: HeaderProps) {
                 <Settings className="w-4 h-4 text-gray-400" />
                 Settings
               </Link>
+              {user?.isAdmin && (
+                <>
+                  <div className="my-1 border-t border-gray-100" />
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-gray-400" />
+                    Admin panel
+                  </Link>
+                </>
+              )}
+              <div className="my-1 border-t border-gray-100" />
               <form action="/api/auth/logout" method="POST">
                 <button
                   type="submit"
