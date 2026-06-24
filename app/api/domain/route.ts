@@ -4,38 +4,38 @@ import { getAdminSettings } from '@/lib/admin'
 import { getDb } from '@/lib/db'
 import { randomUUID } from 'crypto'
 
+// Returns whether the current session user can claim a domain_verifications row.
+// They can if: (a) they already own it, (b) the original user no longer exists,
+// or (c) the original user has the same email (DB-wipe user_id drift).
+function canClaim(db: ReturnType<typeof getDb>, domainRow: Record<string, unknown>, sessionId: string, sessionEmail: string): boolean {
+  if (domainRow.user_id === sessionId) return true
+  const original = db.prepare('SELECT email FROM users WHERE id = ?').get(domainRow.user_id as string) as { email: string } | undefined
+  if (!original) return true // original user deleted — orphaned record, first claimer wins
+  return original.email.toLowerCase() === sessionEmail.toLowerCase()
+}
+
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const db = getDb()
-  // Primary lookup by user_id; also catch records whose user_id drifted after a DB wipe
-  // by joining on email so the same person's domains survive a redeploy.
-  let domains = db.prepare(
-    'SELECT * FROM domain_verifications WHERE user_id = ? ORDER BY created_at DESC'
-  ).all(session.id)
 
-  if (domains.length === 0) {
-    // Fallback: find stale records belonging to any user with the same email (DB wipe scenario)
-    const stale = db.prepare(`
-      SELECT dv.* FROM domain_verifications dv
-      JOIN users u ON u.id = dv.user_id
-      WHERE lower(u.email) = lower(?)
-      ORDER BY dv.created_at DESC
-    `).all(session.email) as Array<Record<string, unknown>>
+  // Fetch all domain rows that belong to this user OR are claimable by them
+  const all = db.prepare('SELECT * FROM domain_verifications ORDER BY created_at DESC').all() as Array<Record<string, unknown>>
 
-    if (stale.length > 0) {
-      // Reassign all stale records to the current session user_id
-      for (const row of stale) {
+  const mine: Array<Record<string, unknown>> = []
+  for (const row of all) {
+    if (canClaim(db, row, session.id, session.email)) {
+      // Migrate user_id to current session if needed
+      if (row.user_id !== session.id) {
         db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, row.id)
+        row.user_id = session.id
       }
-      domains = db.prepare(
-        'SELECT * FROM domain_verifications WHERE user_id = ? ORDER BY created_at DESC'
-      ).all(session.id)
+      mine.push(row)
     }
   }
 
-  return NextResponse.json({ domains })
+  return NextResponse.json({ domains: mine })
 }
 
 export async function POST(req: NextRequest) {
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
   const { domain } = await req.json()
   if (!domain) return NextResponse.json({ error: 'Domain is required' }, { status: 400 })
 
-  // Normalise: strip protocol, www, trailing path
   const cleanDomain = domain.toLowerCase().trim()
     .replace(/^(https?:\/\/)?(www\.)?/, '')
     .split('/')[0]
@@ -60,23 +59,16 @@ export async function POST(req: NextRequest) {
   const existing = db.prepare('SELECT * FROM domain_verifications WHERE domain = ?').get(cleanDomain) as Record<string, unknown> | undefined
 
   if (existing) {
-    if (existing.user_id === session.id) {
-      // Same user, just return the existing record
-      return NextResponse.json({ domain: existing })
-    }
-
-    // Different user_id — check if it's actually the same person (DB wipe / redeploy scenario)
-    const originalOwner = db.prepare('SELECT email FROM users WHERE id = ?').get(existing.user_id as string) as { email: string } | undefined
-    if (originalOwner && originalOwner.email.toLowerCase() === session.email.toLowerCase()) {
-      // Reassign to current session user_id and return
-      db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, existing.id)
+    if (canClaim(db, existing, session.id, session.email)) {
+      // Reassign to current user if needed and return existing record
+      if (existing.user_id !== session.id) {
+        db.prepare('UPDATE domain_verifications SET user_id = ? WHERE id = ?').run(session.id, existing.id)
+      }
       return NextResponse.json({ domain: db.prepare('SELECT * FROM domain_verifications WHERE id = ?').get(existing.id) })
     }
-
     return NextResponse.json({ error: 'This domain is already registered by another account.' }, { status: 409 })
   }
 
-  // Create domain in Postmark
   try {
     const pmRes = await fetch('https://api.postmarkapp.com/domains', {
       method: 'POST',
@@ -92,10 +84,7 @@ export async function POST(req: NextRequest) {
 
     if (!pmRes.ok) {
       if ((pmData.ErrorCode as number) === 505) {
-        // Domain already exists in Postmark — fetch its current details
-        return NextResponse.json({
-          error: 'This domain already exists in Postmark. Remove it from Postmark Domains first, then try again.',
-        }, { status: 409 })
+        return NextResponse.json({ error: 'This domain already exists in Postmark. Remove it from Postmark Domains first, then try again.' }, { status: 409 })
       }
       return NextResponse.json({ error: (pmData.Message as string) || 'Postmark error' }, { status: 400 })
     }
