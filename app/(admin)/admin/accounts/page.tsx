@@ -38,7 +38,7 @@ function Avatar({ name, size = 'md', color }: { name: string; size?: 'sm' | 'md'
   )
 }
 
-interface PendingInvite { id: string; email: string; role: string; created_at: string }
+interface PendingInvite { id: string; token: string; email: string; role: string; created_at: string }
 
 function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: (msg: string) => void }) {
   const [email, setEmail] = useState('')
@@ -224,6 +224,41 @@ function ResetPasswordModal({
             <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl">Cancel</button>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function PendingInviteRow({ inv, onRevoke }: { inv: PendingInvite; onRevoke: (id: string) => void }) {
+  const [copied, setCopied] = useState(false)
+
+  function copyLink() {
+    const url = `${window.location.origin}/register?invite=${inv.token}`
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center justify-between px-5 py-3">
+      <div>
+        <p className="text-sm font-medium text-gray-900">{inv.email}</p>
+        <p className="text-xs text-gray-400">
+          <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold mr-1.5 ${inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{inv.role}</span>
+          Invited {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={copyLink}
+          title="Copy invite link"
+          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${copied ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300'}`}
+        >
+          {copied ? <><CheckIcon className="w-3 h-3" /> Copied!</> : <><Copy className="w-3 h-3" /> Copy link</>}
+        </button>
+        <button onClick={() => onRevoke(inv.id)} title="Revoke invite" className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   )
@@ -533,18 +568,7 @@ export default function AdminAccountsPage() {
           </div>
           <div className="divide-y divide-gray-50">
             {pendingInvites.map(inv => (
-              <div key={inv.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{inv.email}</p>
-                  <p className="text-xs text-gray-400">
-                    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold mr-1.5 ${inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{inv.role}</span>
-                    Invited {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-                <button onClick={() => revokeInvite(inv.id)} title="Revoke invite" className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              <PendingInviteRow key={inv.id} inv={inv} onRevoke={revokeInvite} />
             ))}
           </div>
         </div>
