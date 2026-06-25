@@ -58,6 +58,14 @@ function initSchema(db: Database.Database) {
       company_address TEXT,
       website TEXT,
       logo_url TEXT,
+      anthropic_api_key TEXT,
+      phone TEXT,
+      timezone TEXT,
+      signature_image_url TEXT,
+      privacy_policy_url TEXT,
+      footer_show_update_profile INTEGER DEFAULT 1,
+      footer_show_unsubscribe_comment INTEGER DEFAULT 1,
+      footer_fine_print TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 

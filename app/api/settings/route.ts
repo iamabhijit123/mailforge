@@ -29,6 +29,9 @@ export async function PUT(req: NextRequest) {
   const updates = fields.filter(f => f in body).map(f => `${f} = ?`).join(', ')
   const values = fields.filter(f => f in body).map(f => body[f])
 
+  // Ensure row exists before updating
+  db.prepare(`INSERT OR IGNORE INTO settings (user_id) VALUES (?)`).run(session.id)
+
   if (updates) {
     db.prepare(`UPDATE settings SET ${updates} WHERE user_id = ?`).run(...values, session.id)
   }
