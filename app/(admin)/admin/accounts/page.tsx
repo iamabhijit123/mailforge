@@ -46,6 +46,8 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: (msg: s
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [inviteUrl, setInviteUrl] = useState('')
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState('')
   const [copied, setCopied] = useState(false)
 
   async function handleCreate() {
@@ -59,6 +61,8 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: (msg: s
     if (res.ok) {
       const d = await res.json()
       setInviteUrl(d.url)
+      setEmailSent(d.emailSent)
+      setEmailError(d.emailError || '')
       onDone(`Invite created for ${email}`)
     } else {
       const d = await res.json(); setErr(d.error || 'Failed to create invite')
@@ -121,9 +125,16 @@ function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: (msg: s
             </>
           ) : (
             <>
-              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">
-                Invite link created! Share this link with <strong>{email}</strong>.
-              </div>
+              {emailSent ? (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">
+                  ✅ Invite email sent to <strong>{email}</strong>! They&apos;ll receive the link in their inbox.
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                  ⚠️ Invite created but email could not be sent
+                  {emailError ? `: ${emailError}` : ''}. Share the link below manually.
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Invite link</label>
                 <div className="flex gap-2">
