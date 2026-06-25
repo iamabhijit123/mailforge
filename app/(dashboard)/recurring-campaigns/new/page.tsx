@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation'
 import { Toast } from '@/components/ui'
 import {
   ChevronRight, ChevronLeft, Check, RotateCcw, Users, Calendar,
-  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle,
+  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle, FileText,
 } from 'lucide-react'
 import Link from 'next/link'
 import { TIMEZONE_OPTIONS, tzLabel, todayInTz, currentTimeInTz } from '@/lib/timezones'
 
 interface List { id: string; name: string; contact_count: number }
 interface AccountSettings { sender_name?: string; sender_email?: string; reply_to?: string; timezone?: string; company_address?: string }
+interface Template { id: string; name: string; subject?: string; updated_at: string }
 
 function NoListsModal({ onClose }: { onClose: () => void }) {
   return (
@@ -132,6 +133,7 @@ export default function NewRecurringCampaignPage() {
   const [step, setStep] = useState(1)
   const [lists, setLists] = useState<List[]>([])
   const [folders, setFolders] = useState<FolderItem[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
   const [accountSettings, setAccountSettings] = useState<AccountSettings>({})
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -146,6 +148,8 @@ export default function NewRecurringCampaignPage() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
     send_time: '09:00',
     template_folder_id: '',
+    template_id: '',
+    template_mode: 'folder' as 'folder' | 'single',
     allow_weekends: false,
   })
 
@@ -154,10 +158,12 @@ export default function NewRecurringCampaignPage() {
       fetch('/api/lists').then(r => r.json()),
       fetch('/api/template-folders').then(r => r.json()),
       fetch('/api/settings').then(r => r.json()),
-    ]).then(([ls, flds, s]: [List[], FolderItem[], AccountSettings]) => {
+      fetch('/api/templates').then(r => r.json()),
+    ]).then(([ls, flds, s, tmpl]: [List[], FolderItem[], AccountSettings, Template[]]) => {
       const listsData = Array.isArray(ls) ? ls : []
       setLists(listsData)
       setFolders(Array.isArray(flds) ? flds : [])
+      setTemplates(Array.isArray(tmpl) ? tmpl : [])
       setAccountSettings(s)
       if (listsData.length === 0) setShowNoListsModal(true)
       // Pre-fill from settings
@@ -188,7 +194,7 @@ export default function NewRecurringCampaignPage() {
     if (step === 1) return form.name.trim() && form.subject.trim() && form.from_email.trim() && form.list_ids.length > 0
     if (step === 2) return form.frequency && form.start_date
     if (step === 3) return form.timezone && form.send_time
-    if (step === 4) return !!form.template_folder_id
+    if (step === 4) return form.template_mode === 'folder' ? !!form.template_folder_id : !!form.template_id
     return true
   }
 
@@ -211,7 +217,8 @@ export default function NewRecurringCampaignPage() {
           end_date: form.end_date || null,
           timezone: form.timezone,
           send_time: form.send_time,
-          template_folder_id: form.template_folder_id,
+          template_folder_id: form.template_mode === 'folder' ? form.template_folder_id : null,
+          template_id: form.template_mode === 'single' ? form.template_id : null,
           allow_weekends: form.allow_weekends,
         }),
       })
@@ -411,38 +418,88 @@ export default function NewRecurringCampaignPage() {
         {/* Step 4: Template & Review */}
         {step === 4 && (
           <div className="space-y-5">
-            <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2"><FolderOpen className="w-4 h-4 text-blue-600" /> Template Folder & Review</h2>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Template Folder *</label>
-              <p className="text-xs text-gray-500 mb-3">Each send will use the next template from this folder in rotation.</p>
-              {folders.length === 0 ? (
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
-                  <FolderOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500 mb-2">No template folders yet.</p>
-                  <Link href="/templates/groups/new" target="_blank" className="text-sm text-blue-600 hover:underline">Create a folder in Templates →</Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  {folders.map(f => (
-                    <button
-                      key={f.id}
-                      onClick={() => setForm(prev => ({ ...prev, template_folder_id: f.id }))}
-                      className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${form.template_folder_id === f.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                    >
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
-                      <div>
-                        <p className="font-semibold text-sm text-gray-900">{f.name}</p>
-                        <p className="text-xs text-gray-500">{f.template_count} template{f.template_count !== 1 ? 's' : ''}</p>
-                      </div>
-                      {form.template_folder_id === f.id && <Check className="w-4 h-4 text-blue-600 ml-auto" />}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2"><FolderOpen className="w-4 h-4 text-blue-600" /> Template & Review</h2>
+
+            {/* Mode toggle */}
+            <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
+              <button
+                onClick={() => setForm(f => ({ ...f, template_mode: 'folder', template_id: '' }))}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${form.template_mode === 'folder' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <FolderOpen className="w-4 h-4" /> Template Folder
+              </button>
+              <button
+                onClick={() => setForm(f => ({ ...f, template_mode: 'single', template_folder_id: '' }))}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${form.template_mode === 'single' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <FileText className="w-4 h-4" /> Single Template
+              </button>
             </div>
 
+            {/* Folder mode */}
+            {form.template_mode === 'folder' && (
+              <div>
+                <p className="text-xs text-gray-500 mb-3">Each send will use the next template from this folder in rotation.</p>
+                {folders.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+                    <FolderOpen className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 mb-2">No template folders yet.</p>
+                    <Link href="/templates/groups/new" target="_blank" className="text-sm text-blue-600 hover:underline">Create a folder in Templates →</Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {folders.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setForm(prev => ({ ...prev, template_folder_id: f.id }))}
+                        className={`p-4 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${form.template_folder_id === f.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: f.color }} />
+                        <div>
+                          <p className="font-semibold text-sm text-gray-900">{f.name}</p>
+                          <p className="text-xs text-gray-500">{f.template_count} template{f.template_count !== 1 ? 's' : ''}</p>
+                        </div>
+                        {form.template_folder_id === f.id && <Check className="w-4 h-4 text-blue-600 ml-auto" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Single template mode */}
+            {form.template_mode === 'single' && (
+              <div>
+                <p className="text-xs text-gray-500 mb-3">The same template will be used for every send in this campaign.</p>
+                {templates.length === 0 ? (
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+                    <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 mb-2">No templates yet.</p>
+                    <Link href="/templates" target="_blank" className="text-sm text-blue-600 hover:underline">Create a template →</Link>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                    {templates.map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setForm(prev => ({ ...prev, template_id: t.id }))}
+                        className={`w-full p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${form.template_id === t.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm text-gray-900 truncate">{t.name}</p>
+                          {t.subject && <p className="text-xs text-gray-500 truncate">{t.subject}</p>}
+                        </div>
+                        {form.template_id === t.id && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Review summary */}
-            {form.template_folder_id && (
+            {(form.template_folder_id || form.template_id) && (
               <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                 <p className="font-semibold text-gray-900 mb-3">Campaign Summary</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
@@ -454,7 +511,12 @@ export default function NewRecurringCampaignPage() {
                   <span className="text-gray-400">End</span><span className="font-medium text-gray-900">{form.end_date || 'Ongoing'}</span>
                   <span className="text-gray-400">Send time</span><span className="font-medium text-gray-900">{form.send_time} ({tzLabel(form.timezone)})</span>
                   <span className="text-gray-400">Lists</span><span className="font-medium text-gray-900">{form.list_ids.length} selected</span>
-                  <span className="text-gray-400">Folder</span><span className="font-medium text-gray-900">{folders.find(f => f.id === form.template_folder_id)?.name}</span>
+                  <span className="text-gray-400">Template</span>
+                  <span className="font-medium text-gray-900">
+                    {form.template_mode === 'folder'
+                      ? `Folder: ${folders.find(f => f.id === form.template_folder_id)?.name}`
+                      : templates.find(t => t.id === form.template_id)?.name}
+                  </span>
                   <span className="text-gray-400">Weekends</span><span className="font-medium text-gray-900">{form.allow_weekends ? 'Included' : 'Skipped (weekday only)'}</span>
                 </div>
               </div>

@@ -399,6 +399,21 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN api_access_enabled INTEGER DEFAULT 1`) } catch {}
 
+  // Admin invites — for inviting new workspace owners from the admin panel
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_invites (
+      id TEXT PRIMARY KEY,
+      token TEXT UNIQUE NOT NULL,
+      email TEXT NOT NULL,
+      role TEXT DEFAULT 'user',
+      created_at TEXT DEFAULT (datetime('now')),
+      used_at TEXT
+    )
+  `) } catch {}
+
+  // Recurring campaigns — single template option
+  try { db.exec(`ALTER TABLE recurring_campaigns ADD COLUMN template_id TEXT`) } catch {}
+
   // Settings columns added after initial schema
   try { db.exec(`ALTER TABLE settings ADD COLUMN anthropic_api_key TEXT`) } catch {}
   try { db.exec(`ALTER TABLE settings ADD COLUMN phone TEXT`) } catch {}

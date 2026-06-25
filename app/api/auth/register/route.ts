@@ -4,12 +4,22 @@ import { getDb } from '@/lib/db'
 import { signToken, COOKIE_NAME } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
-  const { name, email, password } = await req.json()
+  const { name, email, password, inviteToken } = await req.json()
   if (!name || !email || !password) return NextResponse.json({ error: 'All fields required' }, { status: 400 })
   if (password.length < 8) return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
 
   const db = getDb()
   const normalEmail = email.toLowerCase().trim()
+
+  // Validate admin invite if provided
+  let inviteRole: string | null = null
+  if (inviteToken) {
+    const invite = db.prepare(`SELECT id, email, role FROM admin_invites WHERE token = ? AND used_at IS NULL`).get(inviteToken) as
+      { id: string; email: string; role: string } | undefined
+    if (!invite) return NextResponse.json({ error: 'Invalid or expired invite link' }, { status: 400 })
+    if (invite.email !== normalEmail) return NextResponse.json({ error: 'This invite was sent to a different email address' }, { status: 400 })
+    inviteRole = invite.role
+  }
 
   const existing = db.prepare('SELECT id, email, password_hash, role FROM users WHERE email = ?').get(normalEmail) as
     { id: string; email: string; password_hash: string; role: string } | undefined
@@ -36,18 +46,24 @@ export async function POST(req: NextRequest) {
   const id = crypto.randomUUID()
   const hash = await bcrypt.hash(password, 12)
 
-  // First workspace owner OR matching ADMIN_EMAIL gets is_admin = 1
+  // Determine admin grant: first owner, matching ADMIN_EMAIL, no admins exist, or invited as admin
   const noOwners = (db.prepare('SELECT COUNT(*) as c FROM users WHERE workspace_id IS NULL').get() as { c: number }).c === 0
   const isAdminEmail = process.env.ADMIN_EMAIL && normalEmail === process.env.ADMIN_EMAIL.toLowerCase()
   const noAdminsExist = (db.prepare('SELECT COUNT(*) as c FROM users WHERE is_admin = 1').get() as { c: number }).c === 0
-  const grantAdmin = noOwners || isAdminEmail || noAdminsExist
+  const grantAdmin = noOwners || isAdminEmail || noAdminsExist || inviteRole === 'admin'
+  const userRole = grantAdmin ? 'admin' : 'member'
 
   db.prepare('INSERT INTO users (id, email, name, password_hash, role, is_workspace_owner, is_admin) VALUES (?, ?, ?, ?, ?, 1, ?)').run(
-    id, normalEmail, name.trim(), hash, grantAdmin ? 'admin' : 'member', grantAdmin ? 1 : 0
+    id, normalEmail, name.trim(), hash, userRole, grantAdmin ? 1 : 0
   )
   db.prepare('INSERT INTO settings (user_id) VALUES (?)').run(id)
 
-  const token = await signToken({ id, memberId: id, email: normalEmail, name: name.trim(), role: grantAdmin ? 'admin' : 'member', isOwner: true })
+  // Mark invite as used
+  if (inviteToken) {
+    db.prepare(`UPDATE admin_invites SET used_at = datetime('now') WHERE token = ?`).run(inviteToken)
+  }
+
+  const token = await signToken({ id, memberId: id, email: normalEmail, name: name.trim(), role: userRole, isOwner: true })
   const res = NextResponse.json({ ok: true })
   res.cookies.set(COOKIE_NAME, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 60 * 60 * 24 * 30, path: '/' })
   return res

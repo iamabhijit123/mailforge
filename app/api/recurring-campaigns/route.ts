@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const {
     name, subject, from_name, from_email, reply_to, cc_emails,
-    list_ids, template_folder_id, frequency, timezone, send_time,
+    list_ids, template_folder_id, template_id, frequency, timezone, send_time,
     start_date, end_date, allow_weekends, sends: manualSends,
   } = body
 
@@ -41,12 +41,12 @@ export async function POST(req: NextRequest) {
 
   db.prepare(`
     INSERT INTO recurring_campaigns
-      (id, user_id, name, subject, from_name, from_email, reply_to, cc_emails, list_ids, template_folder_id, frequency, timezone, send_time, start_date, end_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, user_id, name, subject, from_name, from_email, reply_to, cc_emails, list_ids, template_folder_id, template_id, frequency, timezone, send_time, start_date, end_date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, session.id, name, subject, from_name || '', from_email, reply_to || null,
     JSON.stringify(cc_emails || []), JSON.stringify(list_ids || []),
-    template_folder_id || null, frequency, timezone || 'UTC',
+    template_folder_id || null, template_id || null, frequency, timezone || 'UTC',
     send_time || '09:00', start_date, end_date
   )
 

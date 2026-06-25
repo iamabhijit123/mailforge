@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useState } from 'react'
-import { Shield, Users, Globe, Search, ChevronDown, ChevronRight, Crown, KeyRound, Eye, EyeOff, X } from 'lucide-react'
+import { Shield, Users, Globe, Search, ChevronDown, ChevronRight, Crown, KeyRound, Eye, EyeOff, X, UserPlus, LogIn, Copy, Check as CheckIcon, Trash2 } from 'lucide-react'
 
 interface TeamMember {
   id: string; email: string; name: string | null; role: string
@@ -34,6 +34,111 @@ function Avatar({ name, size = 'md', color }: { name: string; size?: 'sm' | 'md'
   return (
     <div className={`${cls} rounded-full bg-gradient-to-br ${bg} flex items-center justify-center flex-shrink-0`}>
       <span className="text-white font-bold">{name[0]?.toUpperCase()}</span>
+    </div>
+  )
+}
+
+interface PendingInvite { id: string; email: string; role: string; created_at: string }
+
+function InviteModal({ onClose, onDone }: { onClose: () => void; onDone: (msg: string) => void }) {
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'user' | 'admin'>('user')
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const [inviteUrl, setInviteUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  async function handleCreate() {
+    if (!email.trim()) { setErr('Email is required'); return }
+    setSaving(true); setErr('')
+    const res = await fetch('/api/admin/invite', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), role }),
+    })
+    setSaving(false)
+    if (res.ok) {
+      const d = await res.json()
+      setInviteUrl(d.url)
+      onDone(`Invite created for ${email}`)
+    } else {
+      const d = await res.json(); setErr(d.error || 'Failed to create invite')
+    }
+  }
+
+  function copyUrl() {
+    navigator.clipboard.writeText(inviteUrl)
+    setCopied(true); setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h3 className="font-bold text-gray-900">Invite New User</h3>
+            <p className="text-xs text-gray-500 mt-0.5">They&apos;ll get their own workspace</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          {!inviteUrl ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email address</label>
+                <input
+                  type="email" value={email} onChange={e => { setEmail(e.target.value); setErr('') }}
+                  placeholder="client@example.com" autoFocus
+                  className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                />
+                {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Role</label>
+                <div className="flex gap-2">
+                  {(['user', 'admin'] as const).map(r => (
+                    <button
+                      key={r}
+                      onClick={() => setRole(r)}
+                      className={`flex-1 py-2.5 text-sm font-semibold rounded-xl border-2 transition-all capitalize ${role === r ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}
+                    >
+                      {r === 'admin' ? '🛡 Admin' : '👤 User'}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {role === 'admin' ? 'Admin can access this admin panel.' : 'User gets their own workspace, no admin access.'}
+                </p>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={handleCreate} disabled={saving}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2">
+                  {saving ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+                  Generate invite link
+                </button>
+                <button onClick={onClose} className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl">Cancel</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-800">
+                Invite link created! Share this link with <strong>{email}</strong>.
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Invite link</label>
+                <div className="flex gap-2">
+                  <input readOnly value={inviteUrl} className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-xs bg-gray-50 text-gray-700 focus:outline-none" />
+                  <button onClick={copyUrl} className={`px-3 py-2.5 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${copied ? 'bg-green-50 border-green-300 text-green-700' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
+                    {copied ? <><CheckIcon className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">This link can only be used once. The user will set their own name and password.</p>
+              <button onClick={onClose} className="w-full py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl">Done</button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -121,6 +226,9 @@ export default function AdminAccountsPage() {
   const [toast, setToast] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [resetTarget, setResetTarget] = useState<Account | null>(null)
+  const [showInvite, setShowInvite] = useState(false)
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([])
+  const [impersonating, setImpersonating] = useState<string | null>(null)
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -128,6 +236,9 @@ export default function AdminAccountsPage() {
     fetch('/api/admin/accounts')
       .then(r => r.json())
       .then(d => { setAccounts(d.accounts || []); setLoading(false) })
+    fetch('/api/admin/invite')
+      .then(r => r.json())
+      .then(d => setPendingInvites(d.invites || []))
   }, [])
 
   async function update(id: string, patch: Partial<Account>) {
@@ -141,6 +252,20 @@ export default function AdminAccountsPage() {
     setSaving(null)
     if (res.ok) showToast('Account updated')
     else showToast('Update failed')
+  }
+
+  async function revokeInvite(id: string) {
+    await fetch('/api/admin/invite', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    setPendingInvites(prev => prev.filter(i => i.id !== id))
+    showToast('Invite revoked')
+  }
+
+  async function loginAs(accountId: string) {
+    setImpersonating(accountId)
+    const res = await fetch(`/api/admin/impersonate/${accountId}`, { method: 'POST' })
+    setImpersonating(null)
+    if (res.ok) window.location.href = '/dashboard'
+    else showToast('Failed to switch account')
   }
 
   function toggleExpand(id: string) {
@@ -168,18 +293,35 @@ export default function AdminAccountsPage() {
           onDone={msg => showToast(msg)}
         />
       )}
+      {showInvite && (
+        <InviteModal
+          onClose={() => setShowInvite(false)}
+          onDone={msg => {
+            showToast(msg)
+            fetch('/api/admin/invite').then(r => r.json()).then(d => setPendingInvites(d.invites || []))
+          }}
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
           <p className="text-gray-500 mt-1">Manage workspace owners, access, and permissions</p>
         </div>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
-          <Search className="w-4 h-4 text-gray-400" />
-          <input
-            type="text" placeholder="Search accounts…" value={search} onChange={e => setSearch(e.target.value)}
-            className="text-sm outline-none bg-transparent w-48"
-          />
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2">
+            <Search className="w-4 h-4 text-gray-400" />
+            <input
+              type="text" placeholder="Search accounts…" value={search} onChange={e => setSearch(e.target.value)}
+              className="text-sm outline-none bg-transparent w-48"
+            />
+          </div>
+          <button
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <UserPlus className="w-4 h-4" /> Invite User
+          </button>
         </div>
       </div>
 
@@ -284,13 +426,25 @@ export default function AdminAccountsPage() {
                     />
                   </td>
                   <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
-                    <button
-                      onClick={() => setResetTarget(acc)}
-                      title="Reset password"
-                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 hover:border-blue-300 transition-all"
-                    >
-                      <KeyRound className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => loginAs(acc.id)}
+                        disabled={impersonating === acc.id}
+                        title="Login as this user"
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-green-600 border border-gray-200 rounded-lg bg-white hover:bg-green-50 hover:border-green-300 transition-all disabled:opacity-40"
+                      >
+                        {impersonating === acc.id
+                          ? <span className="w-3 h-3 border-2 border-gray-300 border-t-green-500 rounded-full animate-spin" />
+                          : <LogIn className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => setResetTarget(acc)}
+                        title="Reset password"
+                        className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 hover:border-blue-300 transition-all"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
 
@@ -354,6 +508,31 @@ export default function AdminAccountsPage() {
           </tbody>
         </table>
       </div>
+
+      {pendingInvites.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-gray-400" />
+            <p className="text-sm font-semibold text-gray-700">Pending Invites ({pendingInvites.length})</p>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {pendingInvites.map(inv => (
+              <div key={inv.id} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{inv.email}</p>
+                  <p className="text-xs text-gray-400">
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold mr-1.5 ${inv.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>{inv.role}</span>
+                    Invited {new Date(inv.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </p>
+                </div>
+                <button onClick={() => revokeInvite(inv.id)} title="Revoke invite" className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
         <strong>Account active:</strong> Disabled accounts cannot log in or send campaigns.{' '}
