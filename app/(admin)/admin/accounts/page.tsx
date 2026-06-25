@@ -287,7 +287,7 @@ export default function AdminAccountsPage() {
                     <button
                       onClick={() => setResetTarget(acc)}
                       title="Reset password"
-                      className="opacity-0 group-hover:opacity-100 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 hover:border-blue-300 transition-all"
+                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-600 border border-gray-200 rounded-lg bg-white hover:bg-blue-50 hover:border-blue-300 transition-all"
                     >
                       <KeyRound className="w-3.5 h-3.5" />
                     </button>
