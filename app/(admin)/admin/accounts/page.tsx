@@ -346,8 +346,8 @@ export default function AdminAccountsPage() {
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Team / Domains</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">Account active</th>
               <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">API access</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-20">Admin</th>
-              <th className="px-5 py-3 w-16" />
+              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Admin</th>
+              <th className="px-5 py-3 w-24" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -430,14 +430,19 @@ export default function AdminAccountsPage() {
                     </div>
                   </td>
                   <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
-                    <Toggle
-                      checked={!!acc.is_admin}
-                      disabled={saving === acc.id}
-                      onChange={() => update(acc.id, { is_admin: acc.is_admin ? 0 : 1 })}
-                    />
+                    <div className="flex flex-col items-start gap-1">
+                      <Toggle
+                        checked={!!acc.is_admin}
+                        disabled={saving === acc.id}
+                        onChange={() => update(acc.id, { is_admin: acc.is_admin ? 0 : 1 })}
+                      />
+                      <span className={`text-xs font-medium ${acc.is_admin ? 'text-blue-600' : 'text-gray-400'}`}>
+                        {acc.is_admin ? 'Admin' : 'No'}
+                      </span>
+                    </div>
                   </td>
-                  <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
-                    <div className="flex items-center gap-1.5">
+                  <td className="px-4 py-4" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => loginAs(acc.id)}
                         disabled={impersonating === acc.id}

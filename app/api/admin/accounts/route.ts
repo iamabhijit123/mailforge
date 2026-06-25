@@ -8,6 +8,9 @@ export async function GET() {
   if (!session || !isAdmin(session)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const db = getDb()
+  // Ensure the requesting admin's DB row reflects their admin status
+  // (may be 0 if granted via ADMIN_EMAIL env var only)
+  db.prepare('UPDATE users SET is_admin = 1 WHERE id = ? AND is_admin != 1').run(session.memberId)
   const accounts = db.prepare(`
     SELECT
       u.id, u.name, u.email, u.created_at,
