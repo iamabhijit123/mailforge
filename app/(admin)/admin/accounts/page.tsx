@@ -206,7 +206,7 @@ export default function AdminAccountsPage() {
               <Fragment key={acc.id}>
                 {/* Main account row */}
                 <tr
-                  className={`hover:bg-gray-50 transition-colors cursor-pointer ${acc.is_disabled ? 'opacity-60' : ''}`}
+                  className={`group hover:bg-gray-50 transition-colors cursor-pointer ${acc.is_disabled ? 'opacity-60' : ''}`}
                   onClick={() => toggleExpand(acc.id)}
                 >
                   <td className="pl-4 pr-1 py-4">
