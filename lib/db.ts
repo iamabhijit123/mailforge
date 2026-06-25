@@ -391,6 +391,16 @@ function initSchema(db: Database.Database) {
   try { db.exec(`ALTER TABLE users ADD COLUMN is_disabled INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN api_access_enabled INTEGER DEFAULT 1`) } catch {}
 
+  // Settings columns added after initial schema
+  try { db.exec(`ALTER TABLE settings ADD COLUMN anthropic_api_key TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN phone TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN timezone TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN signature_image_url TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN privacy_policy_url TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_show_update_profile INTEGER DEFAULT 1`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_show_unsubscribe_comment INTEGER DEFAULT 1`) } catch {}
+  try { db.exec(`ALTER TABLE settings ADD COLUMN footer_fine_print TEXT`) } catch {}
+
   // Auto-grant admin to first workspace owner if no admins exist yet
   try {
     const adminCount = (db.prepare(`SELECT COUNT(*) as c FROM users WHERE is_admin = 1`).get() as { c: number }).c
