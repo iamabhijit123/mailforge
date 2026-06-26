@@ -8,7 +8,7 @@ import {
   Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle, FileText, Eye,
 } from 'lucide-react'
 import Link from 'next/link'
-import { TIMEZONE_OPTIONS, tzLabel, todayInTz, currentTimeInTz } from '@/lib/timezones'
+import { TIMEZONE_OPTIONS, tzLabel, todayInTz, currentTimeInTz, normalizeTimezone } from '@/lib/timezones'
 import { generateWeekdaySchedule, type Frequency } from '@/lib/schedule-utils'
 
 interface List { id: string; name: string; contact_count: number }
@@ -148,7 +148,7 @@ export default function NewRecurringCampaignPage() {
     name: '', subject: '', from_name: '', from_email: '', reply_to: '', cc_emails: '',
     list_ids: [] as string[],
     frequency: 'weekly', start_date: '', end_date: '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
+    timezone: normalizeTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'),
     send_time: '09:00',
     template_folder_id: '',
     template_ids: [] as string[],
@@ -175,7 +175,7 @@ export default function NewRecurringCampaignPage() {
         from_name: s.sender_name || f.from_name,
         from_email: s.sender_email || f.from_email,
         reply_to: s.reply_to || f.reply_to,
-        timezone: s.timezone || f.timezone,
+        timezone: normalizeTimezone(s.timezone || f.timezone),
       }))
       // Check incomplete settings
       const missing: string[] = []

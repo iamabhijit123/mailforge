@@ -1,3 +1,21 @@
+// Deprecated / alias IANA timezone names → canonical names in our options list
+const TIMEZONE_ALIASES: Record<string, string> = {
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Rangoon': 'Asia/Yangon',
+  'US/Eastern': 'America/New_York',
+  'US/Central': 'America/Chicago',
+  'US/Mountain': 'America/Denver',
+  'US/Pacific': 'America/Los_Angeles',
+  'America/Indiana/Indianapolis': 'America/New_York',
+  'Pacific/Johnston': 'Pacific/Honolulu',
+}
+
+/** Normalize deprecated/alias IANA timezone strings to canonical names */
+export function normalizeTimezone(iana: string): string {
+  return TIMEZONE_ALIASES[iana] ?? iana
+}
+
 export const TIMEZONE_OPTIONS = [
   { label: 'EST/EDT – Eastern US (UTC-5/-4)',      iana: 'America/New_York' },
   { label: 'CST/CDT – Central US (UTC-6/-5)',      iana: 'America/Chicago' },
@@ -27,9 +45,19 @@ export const TIMEZONE_OPTIONS = [
 
 export type IanaTimezone = typeof TIMEZONE_OPTIONS[number]['iana']
 
-/** Return the friendly label for an IANA string, or the raw string if not found */
+/** Return the friendly label for an IANA string, normalizing aliases first */
 export function tzLabel(iana: string): string {
-  return TIMEZONE_OPTIONS.find(t => t.iana === iana)?.label ?? iana
+  const canonical = normalizeTimezone(iana)
+  const found = TIMEZONE_OPTIONS.find(t => t.iana === canonical)
+  if (found) return found.label
+  // Fallback: show IANA name with short UTC offset from the browser
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: iana, timeZoneName: 'short' }).formatToParts(new Date())
+    const shortName = parts.find(p => p.type === 'timeZoneName')?.value
+    return shortName ? `${canonical} (${shortName})` : canonical
+  } catch {
+    return iana
+  }
 }
 
 /** Today's date string (YYYY-MM-DD) in the given IANA timezone */

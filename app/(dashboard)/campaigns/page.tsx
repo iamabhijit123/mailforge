@@ -105,6 +105,8 @@ export default function CampaignsPage() {
   const [filtered, setFiltered] = useState<Campaign[]>([])
   const [lists, setLists] = useState<List[]>([])
   const [loading, setLoading] = useState(true)
+  const [upcomingRecurring, setUpcomingRecurring] = useState<Array<{ id: string; name: string; frequency: string; next_send_at: string; status: string }>>([])
+
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -123,10 +125,14 @@ export default function CampaignsPage() {
   const [syncingStats, setSyncingStats] = useState(false)
 
   async function load(syncId?: string) {
-    const [cRes, lRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists')])
+    const [cRes, lRes, rRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists'), fetch('/api/recurring-campaigns')])
     const cs = await cRes.json()
     setCampaigns(cs)
     setLists(await lRes.json())
+    if (rRes.ok) {
+      const rc = await rRes.json()
+      setUpcomingRecurring(Array.isArray(rc) ? rc.filter((r: { status: string; next_send_at: string }) => r.status === 'active' && r.next_send_at) : [])
+    }
     setLoading(false)
     if (syncId) setPreviewCampaign(cs.find((c: Campaign) => c.id === syncId) ?? null)
   }
@@ -482,6 +488,33 @@ export default function CampaignsPage() {
           </div>
         )}
       </div>
+
+      {/* Recurring campaign schedules — shown in Scheduled or All tab */}
+      {(statusFilter === 'scheduled' || statusFilter === 'all') && upcomingRecurring.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-blue-500" />
+            <p className="text-sm font-semibold text-gray-700">Recurring Campaigns — Upcoming Sends</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {upcomingRecurring.map(rc => (
+              <div key={rc.id} className="flex items-center justify-between px-4 py-3">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{rc.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 capitalize">
+                    {rc.frequency} · Next: <span className="font-medium text-gray-700">{formatDateTime(rc.next_send_at)}</span>
+                  </p>
+                </div>
+                <Link href={`/recurring-campaigns/${rc.id}`}>
+                  <button className="px-3 py-1.5 text-xs font-semibold text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors">
+                    View schedule
+                  </button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Campaign Preview Modal */}
       {previewCampaign && (

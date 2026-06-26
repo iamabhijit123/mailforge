@@ -23,7 +23,22 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ORDER BY rs.scheduled_at ASC
   `).all(id)
 
-  return NextResponse.json({ campaign, sends })
+  // Count unique subscribed contacts across the campaign's lists (dynamic — reflects current list state)
+  const rc = campaign as Record<string, unknown>
+  let contactCount = 0
+  let listNames: string[] = []
+  try {
+    const listIds: string[] = JSON.parse(rc.list_ids as string || '[]')
+    if (listIds.length > 0) {
+      const ph = listIds.map(() => '?').join(',')
+      const r = db.prepare(`SELECT COUNT(DISTINCT c.id) as n FROM contacts c JOIN contact_lists cl ON cl.contact_id = c.id WHERE cl.list_id IN (${ph}) AND c.status = 'subscribed' AND c.user_id = ?`).get(...listIds, session.id) as { n: number }
+      contactCount = r.n
+      const lists = db.prepare(`SELECT name FROM lists WHERE id IN (${ph})`).all(...listIds) as Array<{ name: string }>
+      listNames = lists.map(l => l.name)
+    }
+  } catch { /* ignore */ }
+
+  return NextResponse.json({ campaign, sends, contactCount, listNames })
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { Toast } from '@/components/ui'
 import {
   ArrowLeft, Pause, Play, Trash2, Calendar, Clock, Send,
-  Edit2, Check, X, RotateCcw, FolderOpen, AlertCircle,
+  Edit2, Check, X, RotateCcw, FolderOpen, AlertCircle, Users,
 } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { tzLabel } from '@/lib/timezones'
@@ -116,6 +116,8 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
   const { id } = use(params)
   const [campaign, setCampaign] = useState<RecurringCampaign | null>(null)
   const [sends, setSends] = useState<RecurringSend[]>([])
+  const [contactCount, setContactCount] = useState<number | null>(null)
+  const [listNames, setListNames] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [editingSend, setEditingSend] = useState<RecurringSend | null>(null)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -125,6 +127,8 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
     const data = await res.json()
     setCampaign(data.campaign)
     setSends(Array.isArray(data.sends) ? data.sends : [])
+    setContactCount(data.contactCount ?? null)
+    setListNames(Array.isArray(data.listNames) ? data.listNames : [])
     setLoading(false)
   }
   useEffect(() => { load() }, [id])
@@ -203,7 +207,7 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
       </div>
 
       {/* Stats + Info cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-5 gap-4">
         {[
           { label: 'Total Sends', value: sends.length, icon: RotateCcw },
           { label: 'Sent', value: sentSends.length, icon: Send },
@@ -218,6 +222,22 @@ export default function RecurringCampaignDetailPage({ params }: { params: Promis
             <p className="text-xl font-bold text-gray-900">{s.value}</p>
           </div>
         ))}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-4 h-4 text-gray-400" />
+            <p className="text-xs text-gray-500">Contacts now</p>
+          </div>
+          <p className="text-xl font-bold text-gray-900">{contactCount ?? '—'}</p>
+          {listNames.length > 0 && <p className="text-xs text-gray-400 mt-1 truncate" title={listNames.join(', ')}>{listNames.join(', ')}</p>}
+        </div>
+      </div>
+
+      {/* Dynamic contacts note */}
+      <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-start gap-2.5 text-sm text-blue-800">
+        <AlertCircle className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+        <span>
+          <strong>Contacts are fetched live at each send time</strong> — any contacts added to your lists before a send fires will automatically be included. The count above reflects your current list size.
+        </span>
       </div>
 
       {/* Campaign details */}
