@@ -1,18 +1,19 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Toast } from '@/components/ui'
 import {
   ChevronRight, ChevronLeft, Check, RotateCcw, Users, Calendar,
-  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle, FileText,
+  Clock, FolderOpen, Send, AlertCircle, ArrowRight, X, Settings, CheckCircle, FileText, Eye,
 } from 'lucide-react'
 import Link from 'next/link'
 import { TIMEZONE_OPTIONS, tzLabel, todayInTz, currentTimeInTz } from '@/lib/timezones'
+import { generateWeekdaySchedule, type Frequency } from '@/lib/schedule-utils'
 
 interface List { id: string; name: string; contact_count: number }
 interface AccountSettings { sender_name?: string; sender_email?: string; reply_to?: string; timezone?: string; company_address?: string }
-interface Template { id: string; name: string; subject?: string; updated_at: string }
+interface Template { id: string; name: string; subject?: string; updated_at: string; html_body?: string }
 
 function NoListsModal({ onClose }: { onClose: () => void }) {
   return (
@@ -140,6 +141,8 @@ export default function NewRecurringCampaignPage() {
   const [showNoListsModal, setShowNoListsModal] = useState(false)
   const [incompleteModal, setIncompleteModal] = useState<string[] | null>(null)
   const [showFromEdit, setShowFromEdit] = useState(false)
+  const [previewTemplateId, setPreviewTemplateId] = useState<string | null>(null)
+  const [removedDates, setRemovedDates] = useState<Set<string>>(new Set())
 
   const [form, setForm] = useState({
     name: '', subject: '', from_name: '', from_email: '', reply_to: '', cc_emails: '',
@@ -148,7 +151,7 @@ export default function NewRecurringCampaignPage() {
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York',
     send_time: '09:00',
     template_folder_id: '',
-    template_id: '',
+    template_ids: [] as string[],
     template_mode: 'folder' as 'folder' | 'single',
     allow_weekends: false,
   })
@@ -189,12 +192,25 @@ export default function NewRecurringCampaignPage() {
   function toggleList(id: string) {
     setForm(f => ({ ...f, list_ids: f.list_ids.includes(id) ? f.list_ids.filter(x => x !== id) : [...f.list_ids, id] }))
   }
+  function toggleTemplate(id: string) {
+    setForm(f => ({ ...f, template_ids: f.template_ids.includes(id) ? f.template_ids.filter(x => x !== id) : [...f.template_ids, id] }))
+  }
+
+  const scheduledSends = useMemo(() => {
+    if (!form.start_date) return []
+    const endDate = form.end_date || (() => {
+      const d = new Date(form.start_date + 'T12:00:00Z')
+      d.setUTCFullYear(d.getUTCFullYear() + 1)
+      return d.toISOString().slice(0, 10)
+    })()
+    return generateWeekdaySchedule(form.start_date, endDate, form.frequency as Frequency, form.send_time, form.timezone, form.allow_weekends)
+  }, [form.start_date, form.end_date, form.frequency, form.send_time, form.timezone, form.allow_weekends])
 
   function canNext() {
     if (step === 1) return form.name.trim() && form.subject.trim() && form.from_email.trim() && form.list_ids.length > 0
     if (step === 2) return form.frequency && form.start_date
     if (step === 3) return form.timezone && form.send_time
-    if (step === 4) return form.template_mode === 'folder' ? !!form.template_folder_id : !!form.template_id
+    if (step === 4) return form.template_mode === 'folder' ? !!form.template_folder_id : form.template_ids.length > 0
     return true
   }
 
@@ -218,8 +234,9 @@ export default function NewRecurringCampaignPage() {
           timezone: form.timezone,
           send_time: form.send_time,
           template_folder_id: form.template_mode === 'folder' ? form.template_folder_id : null,
-          template_id: form.template_mode === 'single' ? form.template_id : null,
+          template_ids: form.template_mode === 'single' ? form.template_ids : null,
           allow_weekends: form.allow_weekends,
+          sends: scheduledSends.filter(s => !removedDates.has(s.date)),
         }),
       })
       const data = await res.json()
@@ -423,16 +440,16 @@ export default function NewRecurringCampaignPage() {
             {/* Mode toggle */}
             <div className="flex gap-2 p-1 bg-gray-100 rounded-xl">
               <button
-                onClick={() => setForm(f => ({ ...f, template_mode: 'folder', template_id: '' }))}
+                onClick={() => setForm(f => ({ ...f, template_mode: 'folder', template_ids: [] }))}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${form.template_mode === 'folder' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
                 <FolderOpen className="w-4 h-4" /> Template Folder
               </button>
               <button
-                onClick={() => setForm(f => ({ ...f, template_mode: 'single', template_folder_id: '' }))}
+                onClick={() => setForm(f => ({ ...f, template_mode: 'single', template_folder_id: '', template_ids: [] }))}
                 className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold rounded-lg transition-all ${form.template_mode === 'single' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                <FileText className="w-4 h-4" /> Single Template
+                <FileText className="w-4 h-4" /> Select Templates
               </button>
             </div>
 
@@ -467,10 +484,13 @@ export default function NewRecurringCampaignPage() {
               </div>
             )}
 
-            {/* Single template mode */}
+            {/* Select templates mode (multi-select with preview) */}
             {form.template_mode === 'single' && (
               <div>
-                <p className="text-xs text-gray-500 mb-3">The same template will be used for every send in this campaign.</p>
+                <p className="text-xs text-gray-500 mb-3">
+                  Select one or more templates — they rotate in order on each send.
+                  {form.template_ids.length > 0 && <span className="ml-1 font-semibold text-blue-600">{form.template_ids.length} selected</span>}
+                </p>
                 {templates.length === 0 ? (
                   <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
                     <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
@@ -478,28 +498,108 @@ export default function NewRecurringCampaignPage() {
                     <Link href="/templates" target="_blank" className="text-sm text-blue-600 hover:underline">Create a template →</Link>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                    {templates.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => setForm(prev => ({ ...prev, template_id: t.id }))}
-                        className={`w-full p-3 rounded-xl border-2 text-left transition-all flex items-center gap-3 ${form.template_id === t.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
-                      >
-                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-gray-900 truncate">{t.name}</p>
-                          {t.subject && <p className="text-xs text-gray-500 truncate">{t.subject}</p>}
+                  <div className="flex gap-3">
+                    {/* Template list */}
+                    <div className="flex-1 space-y-2 max-h-64 overflow-y-auto pr-1">
+                      {templates.map(t => {
+                        const selected = form.template_ids.includes(t.id)
+                        const isPreviewing = previewTemplateId === t.id
+                        return (
+                          <div
+                            key={t.id}
+                            onClick={() => toggleTemplate(t.id)}
+                            className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}
+                          >
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${selected ? 'bg-blue-600 border-blue-600' : 'border-gray-300'}`}>
+                              {selected && <Check className="w-2.5 h-2.5 text-white" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm text-gray-900 truncate">{t.name}</p>
+                              {t.subject && <p className="text-xs text-gray-500 truncate">{t.subject}</p>}
+                            </div>
+                            <button
+                              onClick={e => { e.stopPropagation(); setPreviewTemplateId(isPreviewing ? null : t.id) }}
+                              title="Preview template"
+                              className={`p-1.5 rounded-lg flex-shrink-0 transition-all ${isPreviewing ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Preview panel */}
+                    {previewTemplateId && (() => {
+                      const pt = templates.find(t => t.id === previewTemplateId)
+                      return (
+                        <div className="w-52 flex-shrink-0 border border-gray-200 rounded-xl overflow-hidden flex flex-col">
+                          <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between gap-1">
+                            <p className="text-xs font-semibold text-gray-700 truncate">{pt?.name}</p>
+                            <button onClick={() => setPreviewTemplateId(null)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div className="relative overflow-hidden bg-white" style={{ height: 176 }}>
+                            <iframe
+                              key={previewTemplateId}
+                              srcDoc={pt?.html_body || '<div style="padding:20px;color:#9ca3af;font-family:sans-serif;font-size:13px;">No preview</div>'}
+                              style={{ width: 800, height: 680, transform: 'scale(0.26)', transformOrigin: 'top left', pointerEvents: 'none', border: 'none' }}
+                              sandbox="allow-same-origin"
+                            />
+                          </div>
                         </div>
-                        {form.template_id === t.id && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
-                      </button>
-                    ))}
+                      )
+                    })()}
                   </div>
                 )}
               </div>
             )}
 
+            {/* Schedule preview — shown once template is chosen */}
+            {(form.template_folder_id || form.template_ids.length > 0) && scheduledSends.length > 0 && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-blue-600" />
+                    Send Schedule
+                    <span className="text-xs font-normal text-gray-500 ml-1">
+                      ({scheduledSends.filter(s => !removedDates.has(s.date)).length} of {scheduledSends.length} sends)
+                    </span>
+                  </p>
+                  {removedDates.size > 0 && (
+                    <button onClick={() => setRemovedDates(new Set())} className="text-xs text-blue-600 hover:underline">
+                      Restore all
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                  {scheduledSends.map(send => {
+                    const removed = removedDates.has(send.date)
+                    const d = new Date(send.date + 'T12:00:00Z')
+                    const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                    return (
+                      <div key={send.date} className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs transition-all ${removed ? 'opacity-40 bg-red-50 line-through' : 'bg-white border border-gray-100'}`}>
+                        <span className="font-medium text-gray-900">{label} · {send.time}</span>
+                        <button
+                          onClick={() => setRemovedDates(prev => { const n = new Set(prev); removed ? n.delete(send.date) : n.add(send.date); return n })}
+                          className={`ml-2 flex-shrink-0 transition-colors ${removed ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-red-500'}`}
+                          title={removed ? 'Restore' : 'Remove this date'}
+                        >
+                          {removed ? <span className="text-sm">↩</span> : <X className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+                {removedDates.size === 0 && (
+                  <p className="text-xs text-gray-400 mt-2">Click × to remove any specific date from the schedule.</p>
+                )}
+              </div>
+            )}
+
             {/* Review summary */}
-            {(form.template_folder_id || form.template_id) && (
+            {(form.template_folder_id || form.template_ids.length > 0) && (
               <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
                 <p className="font-semibold text-gray-900 mb-3">Campaign Summary</p>
                 <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
@@ -515,7 +615,9 @@ export default function NewRecurringCampaignPage() {
                   <span className="font-medium text-gray-900">
                     {form.template_mode === 'folder'
                       ? `Folder: ${folders.find(f => f.id === form.template_folder_id)?.name}`
-                      : templates.find(t => t.id === form.template_id)?.name}
+                      : form.template_ids.length === 1
+                        ? templates.find(t => t.id === form.template_ids[0])?.name
+                        : `${templates.find(t => t.id === form.template_ids[0])?.name} + ${form.template_ids.length - 1} more (rotating)`}
                   </span>
                   <span className="text-gray-400">Weekends</span><span className="font-medium text-gray-900">{form.allow_weekends ? 'Included' : 'Skipped (weekday only)'}</span>
                 </div>

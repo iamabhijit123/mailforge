@@ -413,6 +413,7 @@ function initSchema(db: Database.Database) {
 
   // Recurring campaigns — single template option
   try { db.exec(`ALTER TABLE recurring_campaigns ADD COLUMN template_id TEXT`) } catch {}
+  try { db.exec(`ALTER TABLE recurring_campaigns ADD COLUMN template_ids TEXT`) } catch {}
 
   // Settings columns added after initial schema
   try { db.exec(`ALTER TABLE settings ADD COLUMN anthropic_api_key TEXT`) } catch {}

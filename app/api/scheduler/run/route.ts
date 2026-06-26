@@ -171,14 +171,15 @@ export async function POST() {
   // 3. Process due recurring sends
   const dueRecurring = db.prepare(`
     SELECT rs.*, rc.user_id, rc.from_name, rc.from_email, rc.reply_to, rc.cc_emails,
-           rc.list_ids, rc.template_folder_id, rc.template_id, rc.rotation_index, rc.subject, rc.name as rc_name
+           rc.list_ids, rc.template_folder_id, rc.template_id, rc.template_ids, rc.rotation_index, rc.subject, rc.name as rc_name
     FROM recurring_sends rs
     JOIN recurring_campaigns rc ON rc.id = rs.recurring_campaign_id
     WHERE rs.status = 'pending' AND rs.scheduled_at <= ? AND rc.status = 'active'
   `).all(now) as Array<{
     id: string; recurring_campaign_id: string; user_id: string
     from_name: string; from_email: string; reply_to: string | null; cc_emails: string
-    list_ids: string; template_folder_id: string | null; template_id: string | null; rotation_index: number
+    list_ids: string; template_folder_id: string | null; template_id: string | null
+    template_ids: string | null; rotation_index: number
     subject: string; rc_name: string
   }>
 
@@ -188,13 +189,17 @@ export async function POST() {
       const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
       if (!postmarkKey) continue
 
-      // Pick template: single template takes priority, then folder rotation
+      // Pick template: template_ids array → folder rotation → single template_id
       let template: Record<string, unknown> | null = null
-      if (rs.template_id) {
-        template = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(rs.template_id, rs.user_id) as Record<string, unknown> | null
+      const templateIds = parseJsonSafe<string[]>(rs.template_ids || '', [])
+      if (templateIds.length > 0) {
+        const tid = templateIds[rs.rotation_index % templateIds.length]
+        template = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(tid, rs.user_id) as Record<string, unknown> | null
       } else if (rs.template_folder_id) {
-        const templates = db.prepare('SELECT * FROM templates WHERE folder_id = ? AND user_id = ? ORDER BY created_at ASC').all(rs.template_folder_id, rs.user_id) as Array<Record<string, unknown>>
-        template = templates.length ? templates[rs.rotation_index % templates.length] : null
+        const folderTemplates = db.prepare('SELECT * FROM templates WHERE folder_id = ? AND user_id = ? ORDER BY created_at ASC').all(rs.template_folder_id, rs.user_id) as Array<Record<string, unknown>>
+        template = folderTemplates.length ? folderTemplates[rs.rotation_index % folderTemplates.length] : null
+      } else if (rs.template_id) {
+        template = db.prepare('SELECT * FROM templates WHERE id = ? AND user_id = ?').get(rs.template_id, rs.user_id) as Record<string, unknown> | null
       }
 
       const companyInfo = settings ? [settings.company_name, settings.company_address].filter(Boolean).join(' · ') : ''
