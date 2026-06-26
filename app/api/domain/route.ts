@@ -83,9 +83,43 @@ export async function POST(req: NextRequest) {
     const pmData = await pmRes.json() as Record<string, unknown>
 
     if (!pmRes.ok) {
-      if ((pmData.ErrorCode as number) === 505) {
-        return NextResponse.json({ error: 'This domain already exists in Postmark. Remove it from Postmark Domains first, then try again.' }, { status: 409 })
+      const msg = ((pmData.Message as string) || '').toLowerCase()
+      const isAlreadyExists = (pmData.ErrorCode as number) === 505 || msg.includes('already exists') || msg.includes('already associated')
+
+      if (isAlreadyExists) {
+        // Domain already in Postmark — import it rather than failing
+        try {
+          const listRes = await fetch('https://api.postmarkapp.com/domains?Count=500&Offset=0', {
+            headers: { Accept: 'application/json', 'X-Postmark-Account-Token': adminSettings.postmark_account_api_key },
+          })
+          const listData = await listRes.json() as { Domains?: Array<{ ID: number; Name: string }> }
+          const match = listData.Domains?.find(d => d.Name.toLowerCase() === cleanDomain)
+
+          if (match) {
+            const detailRes = await fetch(`https://api.postmarkapp.com/domains/${match.ID}`, {
+              headers: { Accept: 'application/json', 'X-Postmark-Account-Token': adminSettings.postmark_account_api_key },
+            })
+            const detail = await detailRes.json() as Record<string, unknown>
+            const isVerified = !!(detail.DKIMVerified)
+
+            const id = randomUUID()
+            db.prepare(`
+              INSERT INTO domain_verifications
+                (id, user_id, domain, postmark_domain_id, dkim_host, dkim_value, dkim_verified, return_path_host, return_path_value, return_path_verified, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              id, session.id, cleanDomain, String(detail.ID),
+              detail.DKIMHost, detail.DKIMTextValue,
+              detail.DKIMVerified ? 1 : 0,
+              detail.ReturnPathDomain, detail.ReturnPathDomainCNAMEValue,
+              detail.ReturnPathDomainVerified ? 1 : 0,
+              isVerified ? 'verified' : 'pending',
+            )
+            return NextResponse.json({ domain: db.prepare('SELECT * FROM domain_verifications WHERE id = ?').get(id) })
+          }
+        } catch { /* fall through */ }
       }
+
       return NextResponse.json({ error: (pmData.Message as string) || 'Postmark error' }, { status: 400 })
     }
 
