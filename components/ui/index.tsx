@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils'
 import React, { forwardRef } from 'react'
-import { TIMEZONE_OPTIONS } from '@/lib/timezones'
+import { TIMEZONE_OPTIONS, normalizeTimezone } from '@/lib/timezones'
 
 // ─── Button ────────────────────────────────────────────────────────────────
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -286,10 +286,12 @@ interface ScheduleDateTimePickerProps {
 }
 
 export function ScheduleDateTimePicker({ onChange, label, compact = false }: ScheduleDateTimePickerProps) {
-  const detectedIana = getDetectedTimezone()
+  // normalizeTimezone converts deprecated IANA aliases (e.g. Asia/Calcutta → Asia/Kolkata)
+  // so the detected timezone correctly matches an entry in TIMEZONE_OPTIONS
+  const detectedIana = normalizeTimezone(getDetectedTimezone())
   const [localDt, setLocalDt] = React.useState('')
   const [timezone, setTimezone] = React.useState<string>(() => {
-    return TIMEZONE_OPTIONS.find(t => t.iana === detectedIana)?.iana || 'UTC'
+    return TIMEZONE_OPTIONS.find(t => t.iana === detectedIana)?.iana ?? 'America/New_York'
   })
 
   // If detected tz isn't in our list, add it as a custom entry

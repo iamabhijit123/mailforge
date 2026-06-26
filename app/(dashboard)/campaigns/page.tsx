@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Toast } from '@/components/ui'
-import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw } from 'lucide-react'
+import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ScheduleDateTimePicker } from '@/components/ui'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
@@ -11,7 +11,7 @@ import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePre
 interface Campaign {
   id: string; name: string; subject: string; status: string; sent_at: string | null
   created_at: string; scheduled_at: string | null; sent: number; unique_opens: number; unique_clicks: number
-  bounces: number; unsubscribes: number; html_body: string | null
+  bounces: number; unsubscribes: number; html_body: string | null; list_ids: string | null
 }
 
 interface List { id: string; name: string; contact_count: number }
@@ -105,7 +105,7 @@ export default function CampaignsPage() {
   const [filtered, setFiltered] = useState<Campaign[]>([])
   const [lists, setLists] = useState<List[]>([])
   const [loading, setLoading] = useState(true)
-  const [upcomingRecurring, setUpcomingRecurring] = useState<Array<{ id: string; name: string; frequency: string; next_send_at: string; status: string }>>([])
+  const [upcomingRecurring, setUpcomingRecurring] = useState<Array<{ id: string; name: string; frequency: string; next_send_at: string; status: string; list_ids: string | null }>>([])
 
   const [q, setQ] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -438,6 +438,18 @@ export default function CampaignsPage() {
                       <span className="text-xs text-gray-500">
                         {isSent && c.sent_at ? `Sent ${formatDate(c.sent_at)}` : isScheduled ? `Scheduled ${c.scheduled_at ? formatDateTime(c.scheduled_at) : ''}` : `Created ${formatDate(c.created_at)}`}
                       </span>
+                      {!isSent && (() => {
+                        const ids: string[] = JSON.parse(c.list_ids || '[]')
+                        const count = ids.reduce((s, lid) => s + (lists.find(l => l.id === lid)?.contact_count || 0), 0)
+                        return ids.length > 0 ? (
+                          <>
+                            <span className="text-xs text-gray-400">·</span>
+                            <span className="flex items-center gap-1 text-xs text-gray-500">
+                              <Users className="w-3 h-3" />{count.toLocaleString()} contacts
+                            </span>
+                          </>
+                        ) : null
+                      })()}
                     </div>
                     {isSent && (c.sent || 0) > 0 && (
                       <div className="flex items-center flex-wrap gap-x-0 text-xs text-blue-600">
@@ -497,12 +509,21 @@ export default function CampaignsPage() {
             <p className="text-sm font-semibold text-gray-700">Recurring Campaigns — Upcoming Sends</p>
           </div>
           <div className="divide-y divide-gray-100">
-            {upcomingRecurring.map(rc => (
+            {upcomingRecurring.map(rc => {
+              const rcListIds: string[] = JSON.parse(rc.list_ids || '[]')
+              const rcContactCount = rcListIds.reduce((s, lid) => s + (lists.find(l => l.id === lid)?.contact_count || 0), 0)
+              return (
               <div key={rc.id} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{rc.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 capitalize">
+                  <p className="text-xs text-gray-500 mt-0.5 capitalize flex items-center gap-1.5 flex-wrap">
                     {rc.frequency} · Next: <span className="font-medium text-gray-700">{formatDateTime(rc.next_send_at)}</span>
+                    {rcContactCount > 0 && (
+                      <>
+                        <span className="text-gray-300">·</span>
+                        <span className="flex items-center gap-1 text-gray-500"><Users className="w-3 h-3" />{rcContactCount.toLocaleString()} contacts</span>
+                      </>
+                    )}
                   </p>
                 </div>
                 <Link href={`/recurring-campaigns/${rc.id}`}>
@@ -511,7 +532,8 @@ export default function CampaignsPage() {
                   </button>
                 </Link>
               </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
