@@ -86,6 +86,39 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     synced++
   }
 
+  // Also sync resend-wave recipients
+  const resendRecipients = db.prepare(`
+    SELECT crr.contact_id, crr.contact_email, crr.postmark_message_id, crr.resend_id
+    FROM campaign_resend_recipients crr
+    JOIN campaign_resends cr ON cr.id = crr.resend_id
+    WHERE cr.campaign_id = ? AND crr.postmark_message_id IS NOT NULL
+  `).all(id) as Array<{ contact_id: string; contact_email: string; postmark_message_id: string; resend_id: string }>
+
+  for (const r of resendRecipients) {
+    const res = await fetch(`https://api.postmarkapp.com/messages/outbound/${r.postmark_message_id}/details`, {
+      headers: { 'X-Postmark-Server-Token': postmarkKey, Accept: 'application/json' },
+    })
+    if (!res.ok) continue
+    const data = await res.json() as { MessageEvents?: Array<{ Type: string; Details?: { Link?: string } }> }
+    for (const e of data.MessageEvents || []) {
+      const t = (e.Type || '').toLowerCase()
+      const eventType = t === 'opened' ? 'open' : (t === 'clicked' || t === 'linkclicked') ? 'click' : null
+      if (!eventType) continue
+      insertEvent.run(crypto.randomUUID(), id, r.contact_id || null, r.contact_email, eventType, e.Details?.Link || null, r.postmark_message_id)
+    }
+  }
+
+  // Update per-wave open/click counts from email_events
+  const waves = db.prepare('SELECT id FROM campaign_resends WHERE campaign_id = ?').all(id) as Array<{ id: string }>
+  for (const wave of waves) {
+    const waveEmails = (db.prepare('SELECT contact_email FROM campaign_resend_recipients WHERE resend_id = ?').all(wave.id) as Array<{ contact_email: string }>).map(r => r.contact_email)
+    if (!waveEmails.length) continue
+    const wph = waveEmails.map(() => '?').join(',')
+    const waveOpens = (db.prepare(`SELECT COUNT(DISTINCT contact_email) as n FROM email_events WHERE campaign_id = ? AND event_type = 'open' AND contact_email IN (${wph})`).get(id, ...waveEmails) as { n: number }).n
+    const waveClicks = (db.prepare(`SELECT COUNT(DISTINCT contact_email) as n FROM email_events WHERE campaign_id = ? AND event_type = 'click' AND contact_email IN (${wph})`).get(id, ...waveEmails) as { n: number }).n
+    db.prepare('UPDATE campaign_resends SET unique_opens = ?, unique_clicks = ? WHERE id = ?').run(waveOpens, waveClicks, wave.id)
+  }
+
   if (synced > 0) {
     db.prepare(`
       UPDATE campaign_stats

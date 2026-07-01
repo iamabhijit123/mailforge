@@ -446,6 +446,38 @@ function initSchema(db: Database.Database) {
       )
     `)
   } catch {}
+
+  // Resend to non-openers: track resend waves and their recipients
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS campaign_resends (
+      id TEXT PRIMARY KEY,
+      campaign_id TEXT NOT NULL,
+      wave_number INTEGER NOT NULL DEFAULT 2,
+      status TEXT DEFAULT 'sent',
+      sent_count INTEGER DEFAULT 0,
+      unique_opens INTEGER DEFAULT 0,
+      unique_clicks INTEGER DEFAULT 0,
+      sent_at TEXT DEFAULT (datetime('now')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS campaign_resend_recipients (
+      id TEXT PRIMARY KEY,
+      resend_id TEXT NOT NULL,
+      contact_id TEXT NOT NULL,
+      contact_email TEXT NOT NULL,
+      postmark_message_id TEXT,
+      sent_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_crr_resend_id ON campaign_resend_recipients(resend_id)`) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_crr_contact_email ON campaign_resend_recipients(contact_email)`) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_campaign_resends_campaign ON campaign_resends(campaign_id)`) } catch {}
+
+  // Auto-resend support for scheduled campaigns
+  try { db.exec(`ALTER TABLE scheduled_campaigns ADD COLUMN auto_resend_after_hours INTEGER DEFAULT 0`) } catch {}
+  try { db.exec(`ALTER TABLE scheduled_campaigns ADD COLUMN is_auto_resend INTEGER DEFAULT 0`) } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).

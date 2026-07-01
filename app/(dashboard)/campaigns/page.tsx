@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { Toast } from '@/components/ui'
-import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw, Users } from 'lucide-react'
+import { Plus, Send, BarChart2, Trash2, Edit2, FlaskConical, Calendar, X, Settings, Search, Copy, MoreHorizontal, RefreshCw, Users, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import { ScheduleDateTimePicker } from '@/components/ui'
 import { TemplatePreviewThumbnail } from '@/components/email-builder/TemplatePreviewThumbnail'
@@ -124,6 +124,15 @@ export default function CampaignsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [syncingStats, setSyncingStats] = useState(false)
 
+  // Resend to non-openers
+  const [resendData, setResendData] = useState<{ waves: Array<{ id: string; wave_number: number; sent_count: number; unique_opens: number; unique_clicks: number; sent_at: string }>; nonOpenerCount: number; totalRecipients: number; totalOpened: number } | null>(null)
+  const [resending, setResending] = useState(false)
+  const [showResendHistory, setShowResendHistory] = useState(false)
+
+  // Auto-resend when scheduling
+  const [autoResend, setAutoResend] = useState(false)
+  const [autoResendDays, setAutoResendDays] = useState(3)
+
   async function load(syncId?: string) {
     const [cRes, lRes, rRes] = await Promise.all([fetch('/api/campaigns'), fetch('/api/lists'), fetch('/api/recurring-campaigns')])
     const cs = await cRes.json()
@@ -230,13 +239,14 @@ export default function CampaignsPage() {
     setActionLoading(true)
     const res = await fetch('/api/scheduled-campaigns', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id: previewCampaign.id, scheduled_at: scheduleAt, list_ids: scheduleListIds }),
+      body: JSON.stringify({ campaign_id: previewCampaign.id, scheduled_at: scheduleAt, list_ids: scheduleListIds, auto_resend_after_hours: autoResend ? autoResendDays * 24 : 0 }),
     })
     setActionLoading(false)
     if (res.ok) {
       setShowScheduleForm(false)
-      setToast({ msg: `Scheduled for ${new Date(scheduleAt).toLocaleString()}`, type: 'success' })
-      setScheduleAt('')
+      const resendNote = autoResend ? ` · Auto-resend in ${autoResendDays}d` : ''
+      setToast({ msg: `Scheduled for ${new Date(scheduleAt).toLocaleString()}${resendNote}`, type: 'success' })
+      setScheduleAt(''); setAutoResend(false)
       setPreviewCampaign(null); load()
     } else {
       const d = await res.json()
@@ -259,11 +269,32 @@ export default function CampaignsPage() {
     else setToast({ msg: data.error || 'Send failed', type: 'error' })
   }
 
+  async function loadResendData(campaignId: string) {
+    const res = await fetch(`/api/campaigns/${campaignId}/resend`)
+    if (res.ok) setResendData(await res.json())
+  }
+
+  async function triggerResend(campaignId: string) {
+    if (!confirm('This will sync opens from Postmark and immediately send to all non-openers. Continue?')) return
+    setResending(true)
+    const res = await fetch(`/api/campaigns/${campaignId}/resend`, { method: 'POST' })
+    const data = await res.json()
+    setResending(false)
+    if (data.ok) {
+      setToast({ msg: `Wave ${data.wave} sent to ${data.sent} non-openers!`, type: 'success' })
+      loadResendData(campaignId)
+    } else {
+      setToast({ msg: data.message || data.error || 'Resend failed', type: data.message ? 'info' : 'error' })
+    }
+  }
+
   function openPreview(c: Campaign) {
     setPreviewCampaign(c)
     setShowTestForm(false); setShowScheduleForm(false); setShowSendNowConfirm(false)
     setTestEmail(''); setScheduleAt('')
     setScheduleListIds([]); setSendListIds([])
+    setResendData(null); setShowResendHistory(false)
+    if (c.status === 'sent') loadResendData(c.id)
   }
 
   function toggleSelect(id: string) {
@@ -578,7 +609,7 @@ export default function CampaignsPage() {
                 </div>
 
                 <div className="p-4 flex flex-col gap-2.5">
-                  {/* SENT: report + sync + copy */}
+                  {/* SENT: report + sync + resend + copy */}
                   {previewCampaign.status === 'sent' && (
                     <>
                       <Link href={`/campaigns/${previewCampaign.id}/report`} className="block">
@@ -591,6 +622,51 @@ export default function CampaignsPage() {
                         {syncingStats ? <span className="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-500 rounded-full animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 text-gray-400" />}
                         Sync Stats from Postmark
                       </button>
+
+                      {/* Resend to non-openers section */}
+                      <div className="border border-orange-200 rounded-xl bg-orange-50/60 p-3 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-orange-800 flex items-center gap-1.5"><RotateCcw className="w-3.5 h-3.5" /> Resend to Non-Openers</p>
+                          {resendData && (
+                            <button onClick={() => setShowResendHistory(h => !h)} className="text-[10px] text-orange-600 hover:text-orange-800 flex items-center gap-0.5">
+                              History {showResendHistory ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </button>
+                          )}
+                        </div>
+
+                        {resendData ? (
+                          <>
+                            {/* Wave 1 stats */}
+                            <div className="text-[11px] text-orange-700 space-y-0.5">
+                              <div className="flex justify-between">
+                                <span>Wave 1 (original)</span>
+                                <span className="font-semibold">{(resendData.totalRecipients).toLocaleString()} sent · {resendData.totalOpened.toLocaleString()} opened</span>
+                              </div>
+                              {showResendHistory && resendData.waves.map(w => (
+                                <div key={w.id} className="flex justify-between text-orange-600 pl-2 border-l border-orange-200">
+                                  <span>Wave {w.wave_number} resend</span>
+                                  <span className="font-semibold">{w.sent_count.toLocaleString()} sent · {w.unique_opens.toLocaleString()} opened</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="text-[11px] text-orange-700 font-semibold bg-orange-100 rounded-lg px-2 py-1.5">
+                              {resendData.nonOpenerCount.toLocaleString()} contacts haven&apos;t opened yet
+                            </div>
+                            {resendData.nonOpenerCount > 0 ? (
+                              <button onClick={() => triggerResend(previewCampaign.id)} disabled={resending}
+                                className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                                {resending ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RotateCcw className="w-3 h-3" />}
+                                {resending ? 'Syncing & Sending…' : `Resend to ${resendData.nonOpenerCount.toLocaleString()} Non-Openers`}
+                              </button>
+                            ) : (
+                              <p className="text-[11px] text-green-700 bg-green-50 rounded-lg px-2 py-1.5 font-medium">Everyone has opened! 🎉</p>
+                            )}
+                          </>
+                        ) : (
+                          <p className="text-[11px] text-orange-600">Loading opens data…</p>
+                        )}
+                      </div>
+
                       <button onClick={() => duplicateCampaign(previewCampaign)} className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
                         <Copy className="w-3.5 h-3.5 text-gray-400" /> Duplicate Campaign
                       </button>
@@ -652,6 +728,26 @@ export default function CampaignsPage() {
                             <ListSelector lists={lists} selected={scheduleListIds} onChange={setScheduleListIds} />
                             <p className="text-xs font-semibold text-gray-700 pt-1">Send date & time:</p>
                             <ScheduleDateTimePicker compact onChange={setScheduleAt} />
+                            {/* Auto-resend to non-openers */}
+                            <div className="border border-gray-200 rounded-lg p-2.5 space-y-2">
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked={autoResend} onChange={e => setAutoResend(e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600" />
+                                <span className="text-xs font-medium text-gray-700 flex items-center gap-1"><RotateCcw className="w-3 h-3 text-gray-400" /> Resend to non-openers</span>
+                              </label>
+                              {autoResend && (
+                                <div className="pl-5">
+                                  <select value={autoResendDays} onChange={e => setAutoResendDays(Number(e.target.value))}
+                                    className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs text-gray-700 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+                                    <option value={1}>1 day after initial send</option>
+                                    <option value={2}>2 days after initial send</option>
+                                    <option value={3}>3 days after initial send</option>
+                                    <option value={5}>5 days after initial send</option>
+                                    <option value={7}>1 week after initial send</option>
+                                  </select>
+                                  <p className="text-[10px] text-gray-400 mt-1">Opens will be synced from Postmark before resending</p>
+                                </div>
+                              )}
+                            </div>
                             <button onClick={scheduleCampaign} disabled={actionLoading || !scheduleAt || !scheduleListIds.length}
                               className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2">
                               {actionLoading ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Calendar className="w-3.5 h-3.5" />}

@@ -67,22 +67,86 @@ export async function POST() {
   const now = new Date().toISOString()
   const results = { scheduled_campaigns: 0, group_items: 0, errors: [] as string[] }
 
-  // 1. Process due scheduled campaigns
+  // 1. Process due scheduled campaigns (original sends + auto-resends)
   const dueCampaigns = db.prepare(`
     SELECT sc.*, c.user_id FROM scheduled_campaigns sc
     JOIN campaigns c ON c.id = sc.campaign_id
     WHERE sc.status = 'pending' AND sc.scheduled_at <= ?
-  `).all(now) as Array<{ id: string; campaign_id: string; user_id: string }>
+  `).all(now) as Array<{ id: string; campaign_id: string; user_id: string; auto_resend_after_hours: number; is_auto_resend: number }>
 
   for (const sc of dueCampaigns) {
     try {
       const settings = db.prepare('SELECT * FROM settings WHERE user_id = ?').get(sc.user_id) as Record<string, unknown> | null
       const postmarkKey = (settings?.postmark_api_key as string) || process.env.POSTMARK_API_KEY
       if (!postmarkKey) continue
-      const companyInfo = [settings?.company_name, settings?.company_address].filter(Boolean).join(' · ')
-      await executeCampaignSend(db, sc.campaign_id, sc.user_id, postmarkKey, (settings?.postmark_message_stream as string) || 'broadcast', companyInfo)
-      db.prepare("UPDATE scheduled_campaigns SET status = 'sent' WHERE id = ?").run(sc.id)
-      results.scheduled_campaigns++
+
+      if (sc.is_auto_resend) {
+        // Auto-resend to non-openers — inline resend logic
+        const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(sc.campaign_id) as Record<string, unknown> | null
+        if (!campaign || campaign.status !== 'sent') { db.prepare("UPDATE scheduled_campaigns SET status = 'sent' WHERE id = ?").run(sc.id); continue }
+
+        const originalMsgIds = db.prepare('SELECT contact_id, contact_email, postmark_message_id FROM campaign_recipients WHERE campaign_id = ? AND postmark_message_id IS NOT NULL').all(sc.campaign_id) as Array<{ contact_id: string; contact_email: string; postmark_message_id: string }>
+        const resendMsgIds = db.prepare(`SELECT crr.contact_id, crr.contact_email, crr.postmark_message_id FROM campaign_resend_recipients crr JOIN campaign_resends cr ON cr.id = crr.resend_id WHERE cr.campaign_id = ? AND crr.postmark_message_id IS NOT NULL`).all(sc.campaign_id) as Array<{ contact_id: string; contact_email: string; postmark_message_id: string }>
+
+        const insertEv = db.prepare('INSERT OR IGNORE INTO email_events (id, campaign_id, contact_id, contact_email, event_type, link_url, postmark_message_id) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        for (const r of [...originalMsgIds, ...resendMsgIds]) {
+          try {
+            const pmRes = await fetch(`https://api.postmarkapp.com/messages/outbound/${r.postmark_message_id}/details`, { headers: { 'X-Postmark-Server-Token': postmarkKey, Accept: 'application/json' } })
+            if (!pmRes.ok) continue
+            const pmData = await pmRes.json() as { MessageEvents?: Array<{ Type: string; Details?: { Link?: string } }> }
+            for (const e of pmData.MessageEvents || []) {
+              const t = (e.Type || '').toLowerCase()
+              const evType = t === 'opened' ? 'open' : (t === 'clicked' || t === 'linkclicked') ? 'click' : null
+              if (evType) insertEv.run(crypto.randomUUID(), sc.campaign_id, r.contact_id || null, r.contact_email, evType, e.Details?.Link || null, r.postmark_message_id)
+            }
+          } catch { /* skip */ }
+        }
+
+        const openerEmails = new Set<string>((db.prepare(`SELECT DISTINCT contact_email FROM email_events WHERE campaign_id = ? AND event_type = 'open'`).all(sc.campaign_id) as Array<{ contact_email: string }>).map(r => r.contact_email))
+        const allRecipientEmails = [...new Set([...originalMsgIds.map(r => r.contact_email), ...resendMsgIds.map(r => r.contact_email)])]
+        const nonOpenerEmails = allRecipientEmails.filter(e => !openerEmails.has(e))
+
+        if (nonOpenerEmails.length > 0) {
+          const ph = nonOpenerEmails.map(() => '?').join(',')
+          const contacts = db.prepare(`SELECT id, email, first_name, last_name FROM contacts WHERE user_id = ? AND email IN (${ph}) AND status = 'subscribed'`).all(sc.user_id, ...nonOpenerEmails) as Array<{ id: string; email: string; first_name: string | null; last_name: string | null }>
+          if (contacts.length > 0) {
+            const maxWave = ((db.prepare('SELECT MAX(wave_number) as m FROM campaign_resends WHERE campaign_id = ?').get(sc.campaign_id) as { m: number | null }).m) || 1
+            const companyInfo = [settings?.company_name, settings?.company_address].filter(Boolean).join(' · ')
+            const blocks = parseJsonSafe(campaign.blocks as string, [])
+            const baseHtml = (campaign.html_body as string) || generateEmailHtml(blocks, {}, '{{unsubscribe_url}}', companyInfo)
+            const msgs = contacts.map(c => ({
+              From: `${campaign.from_name} <${campaign.from_email}>`,
+              To: c.email,
+              Subject: cleanSubject(campaign.subject as string),
+              HtmlBody: personalizeHtml(baseHtml, c, `${APP_URL}/api/unsubscribe?email=${encodeURIComponent(c.email)}&uid=${sc.user_id}`),
+              MessageStream: (settings?.postmark_message_stream as string) || 'broadcast',
+              TrackOpens: true,
+              Metadata: { campaign_id: sc.campaign_id, contact_id: c.id, wave: String(maxWave + 1) },
+            }))
+            const resResults = await sendBatch(postmarkKey, msgs)
+            const sent = resResults.filter(r => r?.ErrorCode === 0).length
+            const resendId = crypto.randomUUID()
+            db.prepare(`INSERT INTO campaign_resends (id, campaign_id, wave_number, status, sent_count, sent_at) VALUES (?, ?, ?, 'sent', ?, datetime('now'))`).run(resendId, sc.campaign_id, maxWave + 1, sent)
+            const insRR = db.prepare('INSERT INTO campaign_resend_recipients (id, resend_id, contact_id, contact_email, postmark_message_id) VALUES (?, ?, ?, ?, ?)')
+            db.transaction(() => { for (let i = 0; i < contacts.length; i++) insRR.run(crypto.randomUUID(), resendId, contacts[i].id, contacts[i].email, resResults[i]?.MessageID || null) })()
+          }
+        }
+        db.prepare("UPDATE scheduled_campaigns SET status = 'sent' WHERE id = ?").run(sc.id)
+        results.scheduled_campaigns++
+      } else {
+        // Normal scheduled send
+        const companyInfo = [settings?.company_name, settings?.company_address].filter(Boolean).join(' · ')
+        await executeCampaignSend(db, sc.campaign_id, sc.user_id, postmarkKey, (settings?.postmark_message_stream as string) || 'broadcast', companyInfo)
+        db.prepare("UPDATE scheduled_campaigns SET status = 'sent' WHERE id = ?").run(sc.id)
+
+        // If auto-resend was configured, schedule the resend now
+        const resendHours = sc.auto_resend_after_hours || 0
+        if (resendHours > 0) {
+          const resendAt = new Date(Date.now() + resendHours * 3600 * 1000).toISOString()
+          db.prepare('INSERT INTO scheduled_campaigns (id, user_id, campaign_id, scheduled_at, is_auto_resend) VALUES (?, ?, ?, ?, 1)').run(crypto.randomUUID(), sc.user_id, sc.campaign_id, resendAt)
+        }
+        results.scheduled_campaigns++
+      }
     } catch (e) {
       results.errors.push(`Campaign ${sc.campaign_id}: ${(e as Error).message}`)
       db.prepare("UPDATE scheduled_campaigns SET status = 'error' WHERE id = ?").run(sc.id)
