@@ -22,6 +22,8 @@ export async function PUT(req: NextRequest) {
   if (!['zerobounce', 'monday'].includes(integration)) return NextResponse.json({ error: 'Unknown integration' }, { status: 400 })
   const db = getDb()
   const col = integration === 'zerobounce' ? 'zerobounce_api_key' : 'monday_api_key'
+  // INSERT the row if it doesn't exist yet, then set the key
+  db.prepare(`INSERT OR IGNORE INTO settings (user_id) VALUES (?)`).run(session.id)
   db.prepare(`UPDATE settings SET ${col} = ? WHERE user_id = ?`).run(api_key || null, session.id)
   return NextResponse.json({ ok: true })
 }
