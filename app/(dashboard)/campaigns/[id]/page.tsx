@@ -33,6 +33,8 @@ export default function CampaignEditorPage() {
   const [resendData, setResendData] = useState<{ waves: Array<{ id: string; wave_number: number; sent_count: number; unique_opens: number; sent_at: string }>; nonOpenerCount: number; totalRecipients: number; totalOpened: number } | null>(null)
   const [resending, setResending] = useState(false)
   const [syncingStats, setSyncingStats] = useState(false)
+  const [resendMode, setResendMode] = useState<'now' | 'later'>('now')
+  const [resendScheduleAt, setResendScheduleAt] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [form, setForm] = useState({ name: '', subject: '', preview_text: '', from_name: '', from_email: '', reply_to: '', cc_emails: '', list_ids: [] as string[] })
 
@@ -130,6 +132,23 @@ export default function CampaignEditorPage() {
   }
 
   async function triggerResend() {
+    if (resendMode === 'later') {
+      if (!resendScheduleAt) { setToast({ msg: 'Please select a date and time', type: 'error' }); return }
+      setResending(true)
+      const res = await fetch('/api/scheduled-campaigns', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaign_id: id, scheduled_at: new Date(resendScheduleAt).toISOString(), is_auto_resend: true }),
+      })
+      const data = await res.json()
+      setResending(false)
+      if (data.ok) {
+        setToast({ msg: `Resend scheduled for ${new Date(resendScheduleAt).toLocaleString()}!`, type: 'success' })
+      } else {
+        setToast({ msg: data.error || 'Scheduling failed', type: 'error' })
+      }
+      return
+    }
     if (!confirm('This will sync opens from Postmark and immediately send to all non-openers. Continue?')) return
     setResending(true)
     const res = await fetch(`/api/campaigns/${id}/resend`, { method: 'POST' })
@@ -267,16 +286,40 @@ export default function CampaignEditorPage() {
                     <p className="text-[11px] text-gray-400">{resendData.waves.length} resend wave{resendData.waves.length !== 1 ? 's' : ''} sent so far</p>
                   )}
                   {resendData.nonOpenerCount > 0 ? (
-                    <button
-                      onClick={triggerResend}
-                      disabled={resending}
-                      className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
-                    >
-                      {resending
-                        ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        : <RotateCcw className="w-3 h-3" />}
-                      {resending ? 'Syncing & Sending…' : `Resend to ${resendData.nonOpenerCount.toLocaleString()} non-openers`}
-                    </button>
+                    <>
+                      {/* Send mode toggle */}
+                      <div className="flex gap-1.5">
+                        {(['now', 'later'] as const).map(m => (
+                          <button key={m} onClick={() => setResendMode(m)}
+                            className={`flex-1 py-1.5 text-[11px] font-semibold rounded-lg border transition-colors ${resendMode === m ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                            {m === 'now' ? 'Send Now' : 'Schedule'}
+                          </button>
+                        ))}
+                      </div>
+                      {resendMode === 'later' && (
+                        <input
+                          type="datetime-local"
+                          value={resendScheduleAt}
+                          onChange={e => setResendScheduleAt(e.target.value)}
+                          min={new Date().toISOString().slice(0, 16)}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-400"
+                        />
+                      )}
+                      <button
+                        onClick={triggerResend}
+                        disabled={resending || (resendMode === 'later' && !resendScheduleAt)}
+                        className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        {resending
+                          ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <RotateCcw className="w-3 h-3" />}
+                        {resending
+                          ? (resendMode === 'later' ? 'Scheduling…' : 'Syncing & Sending…')
+                          : resendMode === 'later'
+                            ? `Schedule Resend`
+                            : `Resend to ${resendData.nonOpenerCount.toLocaleString()} non-openers`}
+                      </button>
+                    </>
                   ) : (
                     <p className="text-[11px] text-green-700 bg-green-50 rounded-xl px-3 py-2 font-medium text-center border border-green-200">Everyone has opened! 🎉</p>
                   )}

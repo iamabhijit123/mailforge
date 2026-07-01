@@ -20,11 +20,18 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const { campaign_id, scheduled_at, list_ids, auto_resend_after_hours = 0 } = body
+  const { campaign_id, scheduled_at, list_ids, auto_resend_after_hours = 0, is_auto_resend = false } = body
   if (!campaign_id || !scheduled_at) return NextResponse.json({ error: 'campaign_id and scheduled_at required' }, { status: 400 })
   const db = getDb()
   const campaign = db.prepare('SELECT id FROM campaigns WHERE id = ? AND user_id = ?').get(campaign_id, session.id)
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
+
+  // For auto-resend scheduling, just insert without touching campaign status
+  if (is_auto_resend) {
+    const id = crypto.randomUUID()
+    db.prepare('INSERT INTO scheduled_campaigns (id, user_id, campaign_id, scheduled_at, auto_resend_after_hours, is_auto_resend) VALUES (?, ?, ?, ?, 0, 1)').run(id, session.id, campaign_id, scheduled_at)
+    return NextResponse.json({ id, ok: true }, { status: 201 })
+  }
 
   if (list_ids && Array.isArray(list_ids) && list_ids.length > 0) {
     db.prepare('UPDATE campaigns SET list_ids = ? WHERE id = ? AND user_id = ?').run(JSON.stringify(list_ids), campaign_id, session.id)
