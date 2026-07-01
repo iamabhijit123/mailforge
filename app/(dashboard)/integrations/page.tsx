@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { Toast } from '@/components/ui'
-import { Search, CheckCircle, ChevronRight, X, Eye, EyeOff, Loader, RefreshCw, Download, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Search, CheckCircle, ChevronRight, X, Eye, EyeOff, Loader, RefreshCw, Download, AlertTriangle, Zap } from 'lucide-react'
 
 // ─── Integration definitions ──────────────────────────────────────────────────
 const INTEGRATIONS = [
@@ -324,6 +325,29 @@ function MondayPanelContent({ apiKey, onSave, onDisconnect }: {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Recipes / Automations */}
+      {isConnected && (
+        <div className="border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50">
+          <div>
+            <p className="text-sm font-semibold text-gray-800">Automation Recipes</p>
+            <p className="text-xs text-gray-500 mt-0.5">Automatically manage contacts when Monday.com column values change — like Zapier, built right in.</p>
+          </div>
+          <Link href="/integrations/monday-recipes"
+            className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl hover:border-red-400 hover:bg-red-50 transition-all group">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #F62B54, #FF6B35)' }}>
+                <Zap className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-800 group-hover:text-red-600 transition-colors">Manage Recipes</p>
+                <p className="text-xs text-gray-400">Create trigger-based automations</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
+          </Link>
         </div>
       )}
 

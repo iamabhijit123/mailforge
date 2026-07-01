@@ -18,7 +18,8 @@ async function mondayQuery(api_key: string, query: string) {
   return json.data
 }
 
-// GET /api/integrations/monday?action=boards
+// GET /api/integrations/monday          → list boards
+// GET /api/integrations/monday?columns=BOARD_ID  → list columns for a board
 export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,7 +28,12 @@ export async function GET(req: NextRequest) {
   const key = s?.monday_api_key
   if (!key) return NextResponse.json({ error: 'Monday.com not configured' }, { status: 400 })
 
+  const boardId = new URL(req.url).searchParams.get('columns')
   try {
+    if (boardId) {
+      const data = await mondayQuery(key, `{ boards(ids: [${boardId}]) { columns { id title type } } }`)
+      return NextResponse.json({ columns: data.boards?.[0]?.columns || [] })
+    }
     const data = await mondayQuery(key, `{ boards(limit: 50, order_by: used_at) { id name description } }`)
     return NextResponse.json({ boards: data.boards || [] })
   } catch (e) {

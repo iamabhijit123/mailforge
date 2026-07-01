@@ -481,6 +481,39 @@ function initSchema(db: Database.Database) {
 
   // Auto-resend support for recurring campaigns
   try { db.exec(`ALTER TABLE recurring_campaigns ADD COLUMN auto_resend_after_hours INTEGER DEFAULT 0`) } catch {}
+
+  // Monday.com Recipes (automation workflows / zaps)
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS monday_recipes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      status TEXT DEFAULT 'paused',
+      trigger_board_id TEXT NOT NULL DEFAULT '',
+      trigger_board_name TEXT,
+      trigger_column_id TEXT NOT NULL DEFAULT '',
+      trigger_column_name TEXT,
+      trigger_value TEXT,
+      steps TEXT NOT NULL DEFAULT '[]',
+      webhook_id TEXT,
+      run_count INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
+  try { db.exec(`
+    CREATE TABLE IF NOT EXISTS monday_recipe_runs (
+      id TEXT PRIMARY KEY,
+      recipe_id TEXT NOT NULL,
+      status TEXT DEFAULT 'done',
+      trigger_email TEXT,
+      trigger_item TEXT,
+      run_log TEXT DEFAULT '[]',
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_monday_recipes_user ON monday_recipes(user_id)`) } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_monday_recipe_runs_recipe ON monday_recipe_runs(recipe_id)`) } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).
