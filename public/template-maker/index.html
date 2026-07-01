@@ -647,6 +647,7 @@
       </div>
       <button class="toolbar-btn save-btn" id="save-btn" onclick="openSaveDialog()" style="display:none">💾 Save</button>
       <button class="toolbar-btn" onclick="copyHTML()" id="copy-btn" style="display:none">📋 Copy</button>
+      <button class="toolbar-btn" onclick="useInEditor()" id="use-in-editor-btn" style="display:none;background:#2563eb;color:#fff;border-color:#2563eb;font-weight:700;">✅ Use in Editor</button>
       <button class="toolbar-btn" onclick="openEmailDialog()" id="send-btn" style="display:none;border-color:#3b82f6;color:#2563eb;">✉️ Send</button>
       <button class="toolbar-btn primary" onclick="downloadHTML()" id="download-btn" style="display:none">⬇️ Download</button>
       <a class="toolbar-btn" id="mailforge-save-btn" href="/templates" target="_parent" style="display:none;background:#16a34a;color:#fff;border-color:#16a34a;font-weight:600;text-decoration:none;">📂 View All Templates</a>
@@ -748,6 +749,7 @@
       document.getElementById('variation-tabs').innerHTML = '';
       document.getElementById('save-btn').style.display = 'none';
       document.getElementById('copy-btn').style.display = 'none';
+      document.getElementById('use-in-editor-btn').style.display = 'none';
       document.getElementById('send-btn').style.display = 'none';
       document.getElementById('download-btn').style.display = 'none';
       document.getElementById('mailforge-save-btn').style.display = 'none';
@@ -914,6 +916,7 @@
     // Hide toolbar actions while loading
     document.getElementById('save-btn').style.display = 'none';
     document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('use-in-editor-btn').style.display = 'none';
     document.getElementById('download-btn').style.display = 'none';
 
     try {
@@ -940,6 +943,7 @@
 
       document.getElementById('save-btn').style.display = 'flex';
       document.getElementById('copy-btn').style.display = 'flex';
+      document.getElementById('use-in-editor-btn').style.display = 'flex';
       document.getElementById('send-btn').style.display = 'flex';
       document.getElementById('download-btn').style.display = 'flex';
       document.getElementById('mailforge-save-btn').style.display = 'flex';
@@ -1005,10 +1009,21 @@
     document.getElementById('empty-state').style.display = 'flex';
     document.getElementById('save-btn').style.display = 'none';
     document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('use-in-editor-btn').style.display = 'none';
     document.getElementById('download-btn').style.display = 'none';
 
     hideError();
     setStatus('ready', 'Cleared — ready to start over');
+  }
+
+  // ── Use in Editor (postMessage to parent EmailBuilder) ──
+  function useInEditor() {
+    const v = variations[activeVariation];
+    if (!v) return;
+    window.parent.postMessage({ type: 'mailforge_use_template', html: v.html }, '*');
+    const btn = document.getElementById('use-in-editor-btn');
+    btn.textContent = '✅ Applied!';
+    setTimeout(() => { btn.textContent = '✅ Use in Editor'; }, 2000);
   }
 
   // ── Copy / Download ──
@@ -1221,6 +1236,7 @@
     document.getElementById('save-btn').style.display = 'none';
     document.getElementById('send-btn').style.display = 'flex';
     document.getElementById('copy-btn').style.display = 'flex';
+    document.getElementById('use-in-editor-btn').style.display = 'flex';
     document.getElementById('download-btn').style.display = 'flex';
     document.getElementById('mailforge-save-btn').style.display = 'none';
 
@@ -1505,6 +1521,7 @@
     document.getElementById('variation-tabs').innerHTML = '';
     document.getElementById('save-btn').style.display = 'none';
     document.getElementById('copy-btn').style.display = 'none';
+    document.getElementById('use-in-editor-btn').style.display = 'none';
     document.getElementById('send-btn').style.display = 'none';
     document.getElementById('download-btn').style.display = 'none';
     setStatus('ready', 'Style preview — click Generate to create a real template in this style');
