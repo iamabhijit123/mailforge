@@ -29,8 +29,8 @@ function pct(num: number, denom: number) {
   return `${Math.round((num / denom) * 100)}%`
 }
 
-function MoreMenu({ campaign, onDelete, onDuplicate, onCancelSchedule }: {
-  campaign: Campaign; onDelete: () => void; onDuplicate: () => void; onCancelSchedule: () => void
+function MoreMenu({ campaign, onDelete, onDuplicate, onCancelSchedule, onResend }: {
+  campaign: Campaign; onDelete: () => void; onDuplicate: () => void; onCancelSchedule: () => void; onResend: () => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -48,7 +48,7 @@ function MoreMenu({ campaign, onDelete, onDuplicate, onCancelSchedule }: {
         <MoreHorizontal className="w-4 h-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-gray-200 shadow-dropdown z-50 py-1">
+        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl border border-gray-200 shadow-dropdown z-50 py-1">
           {campaign.status === 'scheduled' ? (
             <button onClick={() => { onCancelSchedule(); setOpen(false) }}
               className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors">
@@ -61,10 +61,16 @@ function MoreMenu({ campaign, onDelete, onDuplicate, onCancelSchedule }: {
             </Link>
           )}
           {campaign.status === 'sent' && (
-            <Link href={`/campaigns/${campaign.id}/report`} onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-              <BarChart2 className="w-3.5 h-3.5 text-gray-400" /> View report
-            </Link>
+            <>
+              <Link href={`/campaigns/${campaign.id}/report`} onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                <BarChart2 className="w-3.5 h-3.5 text-gray-400" /> View report
+              </Link>
+              <button onClick={() => { onResend(); setOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors">
+                <RotateCcw className="w-3.5 h-3.5" /> Resend to non-openers
+              </button>
+            </>
           )}
           <button onClick={() => { onDuplicate(); setOpen(false) }}
             className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
@@ -82,6 +88,129 @@ function MoreMenu({ campaign, onDelete, onDuplicate, onCancelSchedule }: {
 }
 
 
+type ResendData = { waves: Array<{ id: string; wave_number: number; sent_count: number; unique_opens: number; sent_at: string }>; nonOpenerCount: number; totalRecipients: number; totalOpened: number }
+
+function ResendNonOpenersModal({ campaign, onClose, onToast }: {
+  campaign: Campaign
+  onClose: () => void
+  onToast: (msg: string, type: 'success' | 'error' | 'info') => void
+}) {
+  const [data, setData] = useState<ResendData | null>(null)
+  const [resending, setResending] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+
+  useEffect(() => {
+    fetch(`/api/campaigns/${campaign.id}/resend`).then(r => r.json()).then(setData)
+  }, [campaign.id])
+
+  async function resend() {
+    if (!confirm('Sync opens from Postmark and send to all non-openers?')) return
+    setResending(true)
+    const res = await fetch(`/api/campaigns/${campaign.id}/resend`, { method: 'POST' })
+    const d = await res.json()
+    setResending(false)
+    if (d.ok) {
+      onToast(`Wave ${d.wave} sent to ${d.sent} non-openers!`, 'success')
+      fetch(`/api/campaigns/${campaign.id}/resend`).then(r => r.json()).then(setData)
+    } else {
+      onToast(d.message || d.error || 'Resend failed', d.message ? 'info' : 'error')
+    }
+  }
+
+  async function syncStats() {
+    setSyncing(true)
+    const res = await fetch(`/api/campaigns/${campaign.id}/refresh-stats`, { method: 'POST' })
+    const d = await res.json()
+    setSyncing(false)
+    if (d.ok) {
+      onToast(`Synced — ${d.stats?.uniqueOpens ?? 0} opens, ${d.stats?.uniqueClicks ?? 0} clicks`, 'success')
+      fetch(`/api/campaigns/${campaign.id}/resend`).then(r => r.json()).then(setData)
+    } else {
+      onToast(d.error || 'Sync failed', 'error')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center">
+              <RotateCcw className="w-4.5 h-4.5 text-orange-600" />
+            </div>
+            <div>
+              <h2 className="font-bold text-gray-900 text-sm">Resend to Non-Openers</h2>
+              <p className="text-xs text-gray-500 truncate max-w-[280px]">{campaign.name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 rounded-xl hover:bg-gray-100 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {!data ? (
+            <div className="flex items-center justify-center py-8 text-gray-400 text-sm gap-2">
+              <span className="w-4 h-4 border-2 border-gray-300 border-t-gray-500 rounded-full animate-spin" /> Loading opens data…
+            </div>
+          ) : (
+            <>
+              {/* Stats grid */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Total Sent', value: data.totalRecipients.toLocaleString(), color: 'text-gray-900' },
+                  { label: 'Opened', value: data.totalOpened.toLocaleString(), color: 'text-green-700' },
+                  { label: "Haven't Opened", value: data.nonOpenerCount.toLocaleString(), color: 'text-orange-600' },
+                ].map(s => (
+                  <div key={s.label} className="bg-gray-50 rounded-xl p-3 text-center border border-gray-100">
+                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{s.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Wave history */}
+              {data.waves.length > 0 && (
+                <div className="bg-orange-50 rounded-xl border border-orange-100 p-3 space-y-1.5">
+                  <p className="text-[10px] font-bold text-orange-800 uppercase tracking-widest">Resend History</p>
+                  {data.waves.map(w => (
+                    <div key={w.id} className="flex justify-between text-xs text-orange-700">
+                      <span>Wave {w.wave_number} — {new Date(w.sent_at).toLocaleDateString()}</span>
+                      <span className="font-semibold">{w.sent_count.toLocaleString()} sent · {w.unique_opens.toLocaleString()} opened</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sync button */}
+              <button onClick={syncStats} disabled={syncing}
+                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors">
+                {syncing ? <span className="w-4 h-4 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" /> : <RefreshCw className="w-4 h-4 text-gray-400" />}
+                {syncing ? 'Syncing from Postmark…' : 'Sync Opens from Postmark'}
+              </button>
+
+              {/* Resend action */}
+              {data.nonOpenerCount > 0 ? (
+                <button onClick={resend} disabled={resending}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-bold rounded-xl transition-colors">
+                  {resending ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  {resending ? 'Syncing & Sending…' : `Resend to ${data.nonOpenerCount.toLocaleString()} Non-Openers`}
+                </button>
+              ) : (
+                <div className="text-center py-3 text-sm text-green-700 bg-green-50 rounded-xl border border-green-100 font-semibold">
+                  Everyone has opened! 🎉
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [filtered, setFiltered] = useState<Campaign[]>([])
@@ -96,6 +225,7 @@ export default function CampaignsPage() {
 
   const [previewCampaign, setPreviewCampaign] = useState<Campaign | null>(null)
   const [schedulingCampaign, setSchedulingCampaign] = useState<Campaign | null>(null)
+  const [resendModalCampaign, setResendModalCampaign] = useState<Campaign | null>(null)
   const [testEmail, setTestEmail] = useState('')
   const [testSending, setTestSending] = useState(false)
   const [showTestForm, setShowTestForm] = useState(false)
@@ -492,7 +622,7 @@ export default function CampaignsPage() {
                         </button>
                       </Link>
                     )}
-                    <MoreMenu campaign={c} onDelete={() => deleteCampaign(c.id)} onDuplicate={() => duplicateCampaign(c)} onCancelSchedule={() => cancelSchedule(c.id)} />
+                    <MoreMenu campaign={c} onDelete={() => deleteCampaign(c.id)} onDuplicate={() => duplicateCampaign(c)} onCancelSchedule={() => cancelSchedule(c.id)} onResend={() => setResendModalCampaign(c)} />
                   </div>
                 </div>
               )
@@ -731,6 +861,15 @@ export default function CampaignsPage() {
           onSchedule={scheduleFromModal}
           onSendNow={sendNowFromModal}
           actionLoading={actionLoading}
+        />
+      )}
+
+      {/* Resend to Non-Openers Modal */}
+      {resendModalCampaign && (
+        <ResendNonOpenersModal
+          campaign={resendModalCampaign}
+          onClose={() => setResendModalCampaign(null)}
+          onToast={(msg, type) => setToast({ msg, type })}
         />
       )}
 

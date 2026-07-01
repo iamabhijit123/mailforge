@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Button, Input, Badge, Toast } from '@/components/ui'
-import { ArrowLeft, Send, FlaskConical, Save, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Send, FlaskConical, Save, ChevronDown, RotateCcw, BarChart2, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { EmailBuilder } from '@/components/email-builder/EmailBuilder'
 import { EmailBlock } from '@/lib/email-html'
@@ -30,6 +30,9 @@ export default function CampaignEditorPage() {
   const [showTest, setShowTest] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [resendData, setResendData] = useState<{ waves: Array<{ id: string; wave_number: number; sent_count: number; unique_opens: number; sent_at: string }>; nonOpenerCount: number; totalRecipients: number; totalOpened: number } | null>(null)
+  const [resending, setResending] = useState(false)
+  const [syncingStats, setSyncingStats] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [form, setForm] = useState({ name: '', subject: '', preview_text: '', from_name: '', from_email: '', reply_to: '', cc_emails: '', list_ids: [] as string[] })
 
@@ -50,6 +53,9 @@ export default function CampaignEditorPage() {
         list_ids: parse<string[]>(c.list_ids, []),
       })
       setLoading(false)
+      if (c.status === 'sent') {
+        fetch(`/api/campaigns/${c.id}/resend`).then(r => r.json()).then(setResendData)
+      }
     })
   }, [id])
 
@@ -123,6 +129,33 @@ export default function CampaignEditorPage() {
     }
   }
 
+  async function triggerResend() {
+    if (!confirm('This will sync opens from Postmark and immediately send to all non-openers. Continue?')) return
+    setResending(true)
+    const res = await fetch(`/api/campaigns/${id}/resend`, { method: 'POST' })
+    const data = await res.json()
+    setResending(false)
+    if (data.ok) {
+      setToast({ msg: `Wave ${data.wave} sent to ${data.sent} non-openers!`, type: 'success' })
+      fetch(`/api/campaigns/${id}/resend`).then(r => r.json()).then(setResendData)
+    } else {
+      setToast({ msg: data.message || data.error || 'Resend failed', type: data.message ? 'info' : 'error' })
+    }
+  }
+
+  async function syncStats() {
+    setSyncingStats(true)
+    const res = await fetch(`/api/campaigns/${id}/refresh-stats`, { method: 'POST' })
+    const d = await res.json()
+    setSyncingStats(false)
+    if (d.ok) {
+      setToast({ msg: `Synced — ${d.stats?.uniqueOpens ?? 0} opens, ${d.stats?.uniqueClicks ?? 0} clicks`, type: 'success' })
+      fetch(`/api/campaigns/${id}/resend`).then(r => r.json()).then(setResendData)
+    } else {
+      setToast({ msg: d.error || 'Sync failed', type: 'error' })
+    }
+  }
+
   const toggleList = (lid: string) => setForm(f => ({ ...f, list_ids: f.list_ids.includes(lid) ? f.list_ids.filter(x => x !== lid) : [...f.list_ids, lid] }))
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }))
 
@@ -164,7 +197,12 @@ export default function CampaignEditorPage() {
               <Button size="sm" onClick={() => setShowScheduleModal(true)}><Send className="w-3.5 h-3.5" /> Schedule / Send</Button>
             </>
           )}
-          {isSent && <Link href={`/campaigns/${id}/report`}><Button variant="secondary" size="sm"><ChevronDown className="w-3.5 h-3.5" /> View Report</Button></Link>}
+          {isSent && (
+            <>
+              <Button variant="secondary" size="sm" onClick={syncStats} loading={syncingStats}><RefreshCw className="w-3.5 h-3.5" /> Sync Stats</Button>
+              <Link href={`/campaigns/${id}/report`}><Button variant="secondary" size="sm"><BarChart2 className="w-3.5 h-3.5" /> View Report</Button></Link>
+            </>
+          )}
         </div>
       </div>
 
@@ -203,6 +241,49 @@ export default function CampaignEditorPage() {
               </div>
             )}
           </div>
+
+          {/* Resend to non-openers — visible only for sent campaigns */}
+          {isSent && (
+            <div className="border-t pt-3 space-y-2">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <RotateCcw className="w-3 h-3" /> Resend to Non-Openers
+              </h2>
+              {!resendData ? (
+                <p className="text-xs text-gray-400">Loading opens data…</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-xs bg-gray-50 rounded-xl border border-gray-200 p-3 space-y-1.5">
+                    <div className="flex justify-between text-gray-600">
+                      <span>Total sent</span><span className="font-semibold text-gray-900">{resendData.totalRecipients.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Opened</span><span className="font-semibold text-green-700">{resendData.totalOpened.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between border-t border-gray-100 pt-1.5 text-orange-700">
+                      <span className="font-medium">Haven&apos;t opened</span><span className="font-bold">{resendData.nonOpenerCount.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  {resendData.waves.length > 0 && (
+                    <p className="text-[11px] text-gray-400">{resendData.waves.length} resend wave{resendData.waves.length !== 1 ? 's' : ''} sent so far</p>
+                  )}
+                  {resendData.nonOpenerCount > 0 ? (
+                    <button
+                      onClick={triggerResend}
+                      disabled={resending}
+                      className="w-full py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors flex items-center justify-center gap-1.5"
+                    >
+                      {resending
+                        ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        : <RotateCcw className="w-3 h-3" />}
+                      {resending ? 'Syncing & Sending…' : `Resend to ${resendData.nonOpenerCount.toLocaleString()} non-openers`}
+                    </button>
+                  ) : (
+                    <p className="text-[11px] text-green-700 bg-green-50 rounded-xl px-3 py-2 font-medium text-center border border-green-200">Everyone has opened! 🎉</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-hidden">
