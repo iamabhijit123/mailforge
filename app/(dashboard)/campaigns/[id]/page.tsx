@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Button, Input, Badge, Modal, Toast, ScheduleDateTimePicker } from '@/components/ui'
-import { ArrowLeft, Send, FlaskConical, Save, ChevronDown, Calendar } from 'lucide-react'
+import { Button, Input, Badge, Toast } from '@/components/ui'
+import { ArrowLeft, Send, FlaskConical, Save, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { EmailBuilder } from '@/components/email-builder/EmailBuilder'
 import { EmailBlock } from '@/lib/email-html'
 import { parseJsonSafe as parse } from '@/lib/utils'
+import { ScheduleCampaignModal } from '@/components/ScheduleCampaignModal'
 
 interface Campaign {
   id: string; name: string; subject: string; preview_text: string | null
@@ -27,9 +28,8 @@ export default function CampaignEditorPage() {
   const [htmlBody, setHtmlBody] = useState('')
   const [testEmail, setTestEmail] = useState('')
   const [showTest, setShowTest] = useState(false)
-  const [showSend, setShowSend] = useState(false)
-  const [showSchedule, setShowSchedule] = useState(false)
-  const [scheduleAt, setScheduleAt] = useState('')
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [form, setForm] = useState({ name: '', subject: '', preview_text: '', from_name: '', from_email: '', reply_to: '', cc_emails: '', list_ids: [] as string[] })
 
@@ -79,33 +79,47 @@ export default function CampaignEditorPage() {
     else { const d = await res.json(); setToast({ msg: d.error || 'Failed to send', type: 'error' }) }
   }
 
-  async function sendCampaign() {
-    setShowSend(false)
-    setToast({ msg: 'Sending…', type: 'info' })
+  async function scheduleFromEditor(scheduleAt: string, listIds: string[], autoResendHours: number) {
+    setActionLoading(true)
+    await save()
+    const updatedListIds = listIds
+    const ccArray = form.cc_emails ? form.cc_emails.split(',').map(e => e.trim()).filter(Boolean) : []
+    await fetch(`/api/campaigns/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, cc_emails: ccArray, list_ids: updatedListIds, blocks, html_body: htmlBody }),
+    })
+    const res = await fetch('/api/scheduled-campaigns', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ campaign_id: id, scheduled_at: scheduleAt, auto_resend_after_hours: autoResendHours }),
+    })
+    setActionLoading(false)
+    if (res.ok) {
+      setShowScheduleModal(false)
+      setToast({ msg: `Campaign scheduled for ${new Date(scheduleAt).toLocaleString()}`, type: 'success' })
+      setTimeout(() => router.push('/campaigns'), 2000)
+    } else {
+      const d = await res.json()
+      setToast({ msg: d.error || 'Scheduling failed', type: 'error' })
+    }
+  }
+
+  async function sendNowFromEditor(listIds: string[]) {
+    setActionLoading(true)
+    await save()
+    const ccArray = form.cc_emails ? form.cc_emails.split(',').map(e => e.trim()).filter(Boolean) : []
+    await fetch(`/api/campaigns/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...form, cc_emails: ccArray, list_ids: listIds, blocks, html_body: htmlBody }),
+    })
     const res = await fetch(`/api/campaigns/${id}/send`, { method: 'POST' })
     const data = await res.json()
+    setActionLoading(false)
     if (res.ok) {
+      setShowScheduleModal(false)
       setToast({ msg: `Campaign sent to ${data.sent} contacts!`, type: 'success' })
       setTimeout(() => router.push(`/campaigns/${id}/report`), 2000)
     } else {
       setToast({ msg: data.error || 'Send failed', type: 'error' })
-    }
-  }
-
-  async function scheduleCampaign() {
-    if (!scheduleAt) return
-    await save()
-    const res = await fetch('/api/scheduled-campaigns', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaign_id: id, scheduled_at: scheduleAt }),
-    })
-    if (res.ok) {
-      setShowSchedule(false)
-      setToast({ msg: `Campaign scheduled for ${new Date(scheduleAt).toLocaleString()}`, type: 'success' })
-      setScheduleAt('')
-    } else {
-      const d = await res.json()
-      setToast({ msg: d.error || 'Scheduling failed', type: 'error' })
     }
   }
 
@@ -116,6 +130,17 @@ export default function CampaignEditorPage() {
   if (!campaign) return <div className="text-center mt-20 text-gray-500">Campaign not found</div>
 
   const isSent = campaign.status === 'sent'
+
+  const campaignForModal = {
+    id: campaign.id,
+    name: form.name || campaign.name,
+    subject: form.subject || campaign.subject,
+    status: campaign.status,
+    html_body: htmlBody || campaign.html_body,
+    from_name: form.from_name || campaign.from_name,
+    from_email: form.from_email || campaign.from_email,
+    reply_to: form.reply_to || campaign.reply_to,
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -m-6">
@@ -136,8 +161,7 @@ export default function CampaignEditorPage() {
             <>
               <Button variant="secondary" size="sm" onClick={() => setShowTest(true)}><FlaskConical className="w-3.5 h-3.5" /> Test</Button>
               <Button variant="outline" size="sm" onClick={save} loading={saving}><Save className="w-3.5 h-3.5" /> Save</Button>
-              <Button variant="outline" size="sm" onClick={() => setShowSchedule(true)}><Calendar className="w-3.5 h-3.5" /> Schedule</Button>
-              <Button size="sm" onClick={() => setShowSend(true)}><Send className="w-3.5 h-3.5" /> Send Now</Button>
+              <Button size="sm" onClick={() => setShowScheduleModal(true)}><Send className="w-3.5 h-3.5" /> Schedule / Send</Button>
             </>
           )}
           {isSent && <Link href={`/campaigns/${id}/report`}><Button variant="secondary" size="sm"><ChevronDown className="w-3.5 h-3.5" /> View Report</Button></Link>}
@@ -186,47 +210,35 @@ export default function CampaignEditorPage() {
         </div>
       </div>
 
-      <Modal open={showTest} onClose={() => setShowTest(false)} title="Send Test Email" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">Send a test version of this campaign to preview how it looks.</p>
-          <Input label="Send to email" type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="your@email.com" autoFocus />
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={sendTest}><FlaskConical className="w-3.5 h-3.5" /> Send Test</Button>
-            <Button variant="secondary" onClick={() => setShowTest(false)}>Cancel</Button>
+      {/* Test email inline panel */}
+      {showTest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+            <h2 className="font-bold text-gray-900">Send Test Email</h2>
+            <p className="text-sm text-gray-500">Send a test version of this campaign to preview how it looks.</p>
+            <input
+              type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)}
+              placeholder="your@email.com" autoFocus
+              className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+            />
+            <div className="flex gap-2">
+              <Button className="flex-1" onClick={sendTest}><FlaskConical className="w-3.5 h-3.5" /> Send Test</Button>
+              <Button variant="secondary" onClick={() => setShowTest(false)}>Cancel</Button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
 
-      <Modal open={showSchedule} onClose={() => setShowSchedule(false)} title="Schedule Campaign" size="sm">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-500">Choose a date, time, and timezone to automatically send this campaign.</p>
-          <ScheduleDateTimePicker label="Send Date & Time" onChange={setScheduleAt} />
-          <div className="text-sm text-gray-600 space-y-1">
-            <p><strong>Lists:</strong> {form.list_ids.length === 0 ? 'None selected' : lists.filter(l => form.list_ids.includes(l.id)).map(l => l.name).join(', ')}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={scheduleCampaign} disabled={!scheduleAt}><Calendar className="w-3.5 h-3.5" /> Schedule</Button>
-            <Button variant="secondary" onClick={() => setShowSchedule(false)}>Cancel</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal open={showSend} onClose={() => setShowSend(false)} title="Send Campaign" size="sm">
-        <div className="space-y-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
-            <strong>Ready to send?</strong> This will send your campaign to all subscribed contacts in the selected lists. This cannot be undone.
-          </div>
-          <div className="text-sm text-gray-600 space-y-1">
-            <p><strong>Subject:</strong> {form.subject}</p>
-            <p><strong>From:</strong> {form.from_name} &lt;{form.from_email}&gt;</p>
-            <p><strong>Lists:</strong> {form.list_ids.length === 0 ? 'None selected' : lists.filter(l => form.list_ids.includes(l.id)).map(l => l.name).join(', ')}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button className="flex-1" onClick={sendCampaign}><Send className="w-3.5 h-3.5" /> Send Now</Button>
-            <Button variant="secondary" onClick={() => setShowSend(false)}>Cancel</Button>
-          </div>
-        </div>
-      </Modal>
+      {showScheduleModal && (
+        <ScheduleCampaignModal
+          campaign={campaignForModal}
+          lists={lists}
+          onClose={() => setShowScheduleModal(false)}
+          onSchedule={scheduleFromEditor}
+          onSendNow={sendNowFromEditor}
+          actionLoading={actionLoading}
+        />
+      )}
     </div>
   )
 }

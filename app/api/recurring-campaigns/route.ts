@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const {
     name, subject, from_name, from_email, reply_to, cc_emails,
     list_ids, template_folder_id, template_ids, frequency, timezone, send_time,
-    start_date, end_date, allow_weekends, sends: manualSends,
+    start_date, end_date, allow_weekends, sends: manualSends, auto_resend_after_hours,
   } = body
 
   if (!name || !subject || !from_email || !frequency || !start_date) {
@@ -43,14 +43,15 @@ export async function POST(req: NextRequest) {
   const legacyTemplateId = (!template_ids || template_ids.length !== 1) ? null : template_ids[0]
   db.prepare(`
     INSERT INTO recurring_campaigns
-      (id, user_id, name, subject, from_name, from_email, reply_to, cc_emails, list_ids, template_folder_id, template_id, template_ids, frequency, timezone, send_time, start_date, end_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, user_id, name, subject, from_name, from_email, reply_to, cc_emails, list_ids, template_folder_id, template_id, template_ids, frequency, timezone, send_time, start_date, end_date, auto_resend_after_hours)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, session.id, name, subject, from_name || '', from_email, reply_to || null,
     JSON.stringify(cc_emails || []), JSON.stringify(list_ids || []),
     template_folder_id || null, legacyTemplateId,
     template_ids?.length ? JSON.stringify(template_ids) : null,
-    frequency, timezone || 'UTC', send_time || '09:00', start_date, end_date
+    frequency, timezone || 'UTC', send_time || '09:00', start_date, end_date,
+    auto_resend_after_hours || 0
   )
 
   // For ongoing campaigns (no end_date), generate 1 year of sends upfront

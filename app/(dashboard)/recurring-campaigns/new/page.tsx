@@ -154,6 +154,7 @@ export default function NewRecurringCampaignPage() {
     template_ids: [] as string[],
     template_mode: 'folder' as 'folder' | 'single',
     allow_weekends: false,
+    auto_resend_after_hours: 0,
   })
 
   useEffect(() => {
@@ -236,6 +237,7 @@ export default function NewRecurringCampaignPage() {
           template_folder_id: form.template_mode === 'folder' ? form.template_folder_id : null,
           template_ids: form.template_mode === 'single' ? form.template_ids : null,
           allow_weekends: form.allow_weekends,
+          auto_resend_after_hours: form.auto_resend_after_hours,
           sends: scheduledSends.filter(s => !removedDates.has(s.date)),
         }),
       })
@@ -429,6 +431,39 @@ export default function NewRecurringCampaignPage() {
                 )}
               </p>
             </div>
+
+            {/* Resend to non-openers */}
+            <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Automatic Resends</p>
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.auto_resend_after_hours > 0}
+                  onChange={e => setForm(f => ({ ...f, auto_resend_after_hours: e.target.checked ? 72 : 0 }))}
+                  className="w-4 h-4 rounded border-gray-300 text-blue-600 mt-0.5 flex-shrink-0"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-900">Resend to non-openers</span>
+                  <p className="text-xs text-gray-400 mt-0.5">After each send, automatically resend to contacts who didn&apos;t open it</p>
+                </div>
+              </label>
+              {form.auto_resend_after_hours > 0 && (
+                <div className="pl-7">
+                  <select
+                    value={form.auto_resend_after_hours}
+                    onChange={e => setForm(f => ({ ...f, auto_resend_after_hours: Number(e.target.value) }))}
+                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                  >
+                    <option value={24}>Resend 1 day after initial send</option>
+                    <option value={48}>Resend 2 days after initial send</option>
+                    <option value={72}>Resend 3 days after initial send</option>
+                    <option value={120}>Resend 5 days after initial send</option>
+                    <option value={168}>Resend 1 week after initial send</option>
+                  </select>
+                  <p className="text-[11px] text-gray-400 mt-1.5">Opens are synced from Postmark before each resend</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -620,6 +655,10 @@ export default function NewRecurringCampaignPage() {
                         : `${templates.find(t => t.id === form.template_ids[0])?.name} + ${form.template_ids.length - 1} more (rotating)`}
                   </span>
                   <span className="text-gray-400">Weekends</span><span className="font-medium text-gray-900">{form.allow_weekends ? 'Included' : 'Skipped (weekday only)'}</span>
+                  <span className="text-gray-400">Auto-resend</span>
+                  <span className="font-medium text-gray-900">
+                    {form.auto_resend_after_hours > 0 ? `Resend to non-openers after ${form.auto_resend_after_hours >= 168 ? '1 week' : `${form.auto_resend_after_hours / 24} day${form.auto_resend_after_hours / 24 !== 1 ? 's' : ''}`}` : 'Disabled'}
+                  </span>
                 </div>
               </div>
             )}

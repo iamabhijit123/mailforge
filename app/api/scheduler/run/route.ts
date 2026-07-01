@@ -235,7 +235,8 @@ export async function POST() {
   // 3. Process due recurring sends
   const dueRecurring = db.prepare(`
     SELECT rs.*, rc.user_id, rc.from_name, rc.from_email, rc.reply_to, rc.cc_emails,
-           rc.list_ids, rc.template_folder_id, rc.template_id, rc.template_ids, rc.rotation_index, rc.subject, rc.name as rc_name
+           rc.list_ids, rc.template_folder_id, rc.template_id, rc.template_ids, rc.rotation_index, rc.subject, rc.name as rc_name,
+           rc.auto_resend_after_hours
     FROM recurring_sends rs
     JOIN recurring_campaigns rc ON rc.id = rs.recurring_campaign_id
     WHERE rs.status = 'pending' AND rs.scheduled_at <= ? AND rc.status = 'active'
@@ -244,7 +245,7 @@ export async function POST() {
     from_name: string; from_email: string; reply_to: string | null; cc_emails: string
     list_ids: string; template_folder_id: string | null; template_id: string | null
     template_ids: string | null; rotation_index: number
-    subject: string; rc_name: string
+    subject: string; rc_name: string; auto_resend_after_hours: number
   }>
 
   for (const rs of dueRecurring) {
@@ -284,6 +285,15 @@ export async function POST() {
       // Mark send done, increment rotation
       db.prepare("UPDATE recurring_sends SET status = 'sent', campaign_id = ? WHERE id = ?").run(campaignId, rs.id)
       db.prepare('UPDATE recurring_campaigns SET rotation_index = rotation_index + 1 WHERE id = ?').run(rs.recurring_campaign_id)
+
+      // Schedule auto-resend to non-openers if configured
+      if (rs.auto_resend_after_hours > 0) {
+        const resendAt = new Date(Date.now() + rs.auto_resend_after_hours * 60 * 60 * 1000).toISOString()
+        db.prepare(`
+          INSERT INTO scheduled_campaigns (id, user_id, campaign_id, scheduled_at, auto_resend_after_hours, is_auto_resend)
+          VALUES (?, ?, ?, ?, 0, 1)
+        `).run(crypto.randomUUID(), rs.user_id, campaignId, resendAt)
+      }
 
       // Mark completed if all sends done
       const pending = db.prepare("SELECT COUNT(*) as n FROM recurring_sends WHERE recurring_campaign_id = ? AND status = 'pending'").get(rs.recurring_campaign_id) as { n: number }

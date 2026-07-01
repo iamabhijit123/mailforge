@@ -478,6 +478,9 @@ function initSchema(db: Database.Database) {
   // Auto-resend support for scheduled campaigns
   try { db.exec(`ALTER TABLE scheduled_campaigns ADD COLUMN auto_resend_after_hours INTEGER DEFAULT 0`) } catch {}
   try { db.exec(`ALTER TABLE scheduled_campaigns ADD COLUMN is_auto_resend INTEGER DEFAULT 0`) } catch {}
+
+  // Auto-resend support for recurring campaigns
+  try { db.exec(`ALTER TABLE recurring_campaigns ADD COLUMN auto_resend_after_hours INTEGER DEFAULT 0`) } catch {}
 }
 
 // Re-creates the user row if the DB was wiped (e.g. Railway redeploy resets /tmp).
