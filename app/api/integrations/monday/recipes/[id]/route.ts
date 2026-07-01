@@ -20,22 +20,26 @@ type DbRecipe = {
   webhook_id: string | null; steps: string
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+type RouteParams = { params: Promise<{ id: string }> }
+
+export async function GET(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
-  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(params.id, session.id)
+  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(id, session.id)
   if (!recipe) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  const runs = db.prepare('SELECT * FROM monday_recipe_runs WHERE recipe_id = ? ORDER BY created_at DESC LIMIT 30').all(params.id)
+  const runs = db.prepare('SELECT * FROM monday_recipe_runs WHERE recipe_id = ? ORDER BY created_at DESC LIMIT 30').all(id)
   return NextResponse.json({ ...recipe, runs })
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
 
-  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(params.id, session.id) as DbRecipe | undefined
+  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(id, session.id) as DbRecipe | undefined
   if (!recipe) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const body = await req.json()
@@ -59,7 +63,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   let webhookId = recipe.webhook_id
 
   if (apiKey) {
-    // Remove old webhook if deactivating or trigger changed
     if ((deactivating || boardChanged) && recipe.webhook_id) {
       try {
         await mondayMutation(apiKey, `mutation { delete_webhook(id: ${recipe.webhook_id}) { id } }`)
@@ -67,7 +70,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       webhookId = null
     }
 
-    // Register new webhook if activating
     if (activating && !deactivating && newBoardId) {
       try {
         const host = req.headers.get('host') || ''
@@ -78,7 +80,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         webhookId = data?.create_webhook?.id ?? null
       } catch (e) {
         console.error('Webhook registration failed:', (e as Error).message)
-        // Save recipe but return warning
       }
     }
   }
@@ -103,18 +104,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     trigger_value ?? null,
     steps != null ? JSON.stringify(steps) : null,
     webhookId,
-    params.id, session.id,
+    id, session.id,
   )
 
   return NextResponse.json({ ok: true, webhook_id: webhookId })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: RouteParams) {
+  const { id } = await params
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const db = getDb()
 
-  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(params.id, session.id) as DbRecipe | undefined
+  const recipe = db.prepare('SELECT * FROM monday_recipes WHERE id = ? AND user_id = ?').get(id, session.id) as DbRecipe | undefined
   if (!recipe) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (recipe.webhook_id) {
@@ -124,7 +126,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     }
   }
 
-  db.prepare('DELETE FROM monday_recipe_runs WHERE recipe_id = ?').run(params.id)
-  db.prepare('DELETE FROM monday_recipes WHERE id = ? AND user_id = ?').run(params.id, session.id)
+  db.prepare('DELETE FROM monday_recipe_runs WHERE recipe_id = ?').run(id)
+  db.prepare('DELETE FROM monday_recipes WHERE id = ? AND user_id = ?').run(id, session.id)
   return NextResponse.json({ ok: true })
 }
